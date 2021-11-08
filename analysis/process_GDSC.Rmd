@@ -1,0 +1,255 @@
+---
+title: "Pre-processing GDSC drug screen datasets"
+author: "Junyan Lu"
+date: "2021-10-05"
+output: workflowr::wflow_html
+editor_options:
+  chunk_output_type: inline
+---
+
+# Introduction
+
+This document shows the pre-processing steps of the GDSC cancer cell line screening dataset from https://www.cancerrxgene.org/. A subset of leukemia and breast cancer cell lines was chosen for this analysis (called set1 hereinafter). The analyzed cancer types were
+
+- Diffuse Large B-Cell Lymphoma (DLBC)
+- Acute lymphocytic leukemia (ALL)
+- Acute myeloid leukemia (L-AML)
+
+- Breast carcinoma (BRCAHer+ / BRCAHer-)
+
+The Her2 status was annotated manually.
+
+***
+
+# Load packages
+
+Packages
+```{r message=FALSE, warning=FALSE}
+library(depInfeR)
+library(missForest)
+library(tidyverse)
+source("../code/utils.R")
+knitr::opts_chunk$set(dev = c("png","pdf"))
+```
+
+# Read data sets
+
+Load pre-processed kinobead table table
+```{r}
+tarList <- readRDS("../output/allTargets.rds")
+```
+
+Load GDSC raw data tables
+```{r warning=FALSE, message=FALSE}
+# GDSC cell line screening data (for each of the cancer types and the table with the drug synonyms)
+cancerxgene_ALL <- read_csv("../data/GDSC/cancerxgene_ALL_IC_GDSC1.csv")
+cancerxgene_DLBC <- read_csv("../data/GDSC/cancerxgene_DLBC_IC_GDSC1.csv")
+cancerxgene_AML <- read_csv("../data/GDSC/cancerxgene_AML_IC_GDSC1.csv")
+cancerxgene_BRCA <- read_csv("../data/GDSC/cancerxgene_BRCA_IC_GDSC1.csv")
+cancerxgene_syn <- read_csv("../data/GDSC/GDSC1_druglist_pubchem.csv")
+
+
+# cancer cell line genetic background annotation
+# mutations
+BRCA_mut <- read_csv("../data/GDSC/BRCA_genetic.csv", col_names = TRUE, col_types = cols(.default = col_factor()))
+ALL_mut <- read_csv("../data/GDSC/ALL_genetics.csv", col_names = TRUE, col_types = cols(.default = col_factor()))
+LAML_mut <- read_csv("../data/GDSC/LAML_genetic.csv", col_names = TRUE, col_types = cols(.default = col_factor()))
+DLBC_mut <- read_csv("../data/GDSC/DLBC_genetic.csv", col_names = TRUE, col_types = cols(.default = col_factor()))
+```
+
+
+# Preprocess drug target dataset
+
+In order to apply the regression algorithm both datasets need to be filtered for matching drugs. Therefore, the used drug names need to be aligned and the datatables need to be filtered for the overlapping drug names. 
+To find as many matching drug names as possible, we firstly add the synonym columns that we found in different tables for each of the datasets to the datatables.
+Secondly, we calculate the Hamming Distance between the drug names (including the synonyms columns) to find matching drug names with only slightly different spelling.
+
+## Preprocess cancer cell line drug screen
+
+Combine drug-cell line matrices of GDSC cancer cell line set (set1)
+```{r}
+bind_rows_keep_factors <- function(...) {
+  ## Identify all factors
+  factors <- unique(unlist(
+    map(list(...), ~ select_if(..., is.factor) %>% names())
+  ))
+  ## Bind dataframes, convert characters back to factors
+  suppressWarnings(bind_rows(...)) %>% 
+    mutate_at(dplyr::vars(one_of(factors)), factor)  
+}
+
+cancerxgene_set1 <- bind_rows_keep_factors(cancerxgene_ALL, cancerxgene_AML, cancerxgene_DLBC, cancerxgene_BRCA)
+
+```
+
+Attach synonyms to cancerxgene table
+```{r}
+cancerxgene_set1$synonyms <- cancerxgene_syn$Synonyms[match(cancerxgene_set1$`Drug name`, cancerxgene_syn$Name)]
+```
+
+Process drug names of cancerxgene table
+```{r}
+cancerxgene_set1 <- mutate(cancerxgene_set1, `Drug name` = tolower(`Drug name`)) %>%
+  mutate(`Drug name` = gsub("[- ]","",`Drug name`))  %>% mutate(`Drug name`= gsub(" *\\(.*?\\) *", "",`Drug name`)) 
+```
+
+
+## Find overlapping drugs between datasets
+
+Find overlapped drugs by drug names
+```{r}
+overDrug_cancerx_set1_name <- intersect(tarList$Drug, cancerxgene_set1$`Drug name`)
+```
+
+Assign manually identified synonyms 
+```{r}
+tarList <- mutate(tarList, Drug = ifelse(Drug=="alvocidib", "flavopiridol", Drug))
+tarList <- mutate(tarList, Drug = ifelse(Drug=="canertinib", "ci1033", Drug))
+tarList <- mutate(tarList, Drug = ifelse(Drug=="dacomitinib", "pf00299804", Drug))
+tarList <- mutate(tarList, Drug = ifelse(Drug=="nintedanib", "bibf1120", Drug))
+```
+
+Get the final overlapped drug list
+```{r}
+finalList <- intersect(tarList$Drug, cancerxgene_set1$`Drug name`)
+```
+
+Rename drug column in cancerxgene
+```{r}
+cancerxgene_set1 <- dplyr::rename(cancerxgene_set1, Drug = `Drug name`)
+cancerxgene_set1_druglist <- filter(cancerxgene_set1, !is.na(`Drug Id`), !duplicated(`Drug Id`), !duplicated(Drug))
+```
+
+
+## Match drug IDs and create drug-target affinity matrix
+
+Combine the lists
+```{r}
+targets <- left_join(tarList, cancerxgene_set1_druglist, by = "Drug") %>% dplyr::select(Drug, `Drug Id`, `Target Classification`, EC50,`Apparent Kd`, `Gene Name`) %>%
+  filter(!is.na(Drug)) %>%
+  filter(Drug %in% finalList) 
+```
+
+How many drugs?
+```{r}
+length(unique(targets$Drug))
+```
+
+Change column names
+```{r}
+colnames(targets) <- c("drugName", "drugID", "targetClassification","EC50","Kd","targetName")
+```
+
+Turn target table into drug-target affinity matrix
+```{r}
+tarMat_kd <- dplyr::filter(targets, targetClassification == "High confidence") %>% 
+    dplyr::select(drugName, targetName, Kd) %>% 
+    spread(key = "targetName", value = "Kd") %>%
+    remove_rownames() %>% column_to_rownames("drugName") %>% as.matrix()
+```
+
+Function to transform Kd values (using arctan function)
+```{r supp_arcTrans, fig.height=5, fig.width=7}
+testTab <- tibble(x = seq(-6,2,length.out = 20)) %>% mutate(y = arcTrans(x, b=2, g=3))
+ggplot(testTab, aes(x=x,y=y)) + geom_point() + 
+  xlab(bquote("original "~-log[10]*"(Kd) value")) + ylab("transformed value") +
+  theme_custom
+```
+
+
+As a pre-processing of the drug-protein affinity matrix with kd values (or optionally other affinity measurement values at roughly normal distribution) we chose to perform the following steps:
+
+- log-transform kd values (ifKd = TRUE)
+- arctan-transform log(kd) values (ifKd = TRUE)
+- check target similarity and remove highly correlated targets (ifCorFeat = TRUE)
+
+```{r}
+ProcessTargetResults <- processTarget(tarMat_kd, ifKd = TRUE , ifCorFeat = TRUE)
+```
+
+
+## Visualize target groups of highly correlated targets in network map
+```{r targetNet_GDSC, fig.height=8, fig.width=8}
+
+load("../output/GDSC_result.RData")
+CancerxTargets<- rowSums(result$freqMat)
+CancerxTargets <- names(CancerxTargets[CancerxTargets>0])
+plotTarGroups(ProcessTargetResults, CancerxTargets)
+
+#plot network
+plotTarGroups(ProcessTargetResults, CancerxTargets)
+```
+
+
+
+# Prepare drug response matrix (drug X cell line)
+
+## Prepare response matrix using the z-score 
+
+The z-score was chosen as a suitable measurement value for our drug screening response matrix as it corresponds to a normalization for each drug over all cell lines. When working with AUC or IC50 values, a suitable normalization of the values is recommended.
+In this analysis I used the z-score of the AUC values.
+
+
+```{r}
+sanger_viab <- dplyr::filter(cancerxgene_set1, `Drug Id` %in%targetsGDSC$drugID) %>%
+  dplyr::select(Drug, `Drug Id`, `Cell line name` , `Cosmic sample Id`, `TCGA classification`, IC50, AUC, `Max conc`,RMSE, `Z score`)
+sanger_matrix <- sanger_viab %>% dplyr::select(Drug, `Cell line name`, AUC) %>% 
+  tidyr::spread(key = `Cell line name`, value = AUC) %>%
+  remove_rownames() %>% column_to_rownames("Drug") %>%
+  as.matrix()
+```
+
+
+## Assessment of missing values
+
+As we have some missing values in our response matrix, we check the distribution of our missing values across all cell lines
+```{r}
+missTab <- data.frame(NA_cutoff = character(0), remain_celllines = character(0), stringsAsFactors = FALSE)
+      
+for (i in 0 : 138) {
+  a <- dim(sanger_matrix[,colSums(is.na(sanger_matrix)) <= i])[2]
+  missTab [i,] <- c(i, a)
+}
+#missTab
+#plot(missTab, type = "l")
+```
+
+From looking at the missing value distribution, we choose cell lines with a maximum of 24 missing values per cell line (= 35%) as usable for the MissForest imputation method.
+
+##  Subset for cell lines with less than 24 missing values (based on assessment above)
+```{r}
+sanger_mat_subset <- sanger_matrix[,colSums(is.na(sanger_matrix)) <= 24]
+```
+
+##  MissForest imputation
+```{r}
+impRes <- missForest(t(sanger_mat_subset))
+imp_missforest <- impRes$ximp
+
+sanger_mat_forest <- t(imp_missforest)
+colnames(sanger_mat_forest) <- colnames(sanger_mat_forest)
+rownames(sanger_mat_forest) <- rownames(sanger_mat_forest)
+```
+
+##  Column-wise z-score
+```{r}
+sanger_mat_forest.scale <- t(mscale(t(sanger_mat_forest)))
+```
+
+# Read cell line annotations
+```{r}
+mutation_GDSC <- readxl::read_xlsx("../data/GDSC/mutation_GDSC.xlsx") %>%
+  data.frame() %>%
+  column_to_rownames("cellLine")
+
+```
+
+# Save pre-processed dataset
+
+```{r}
+ProcessTargetResults_GDSC <- ProcessTargetResults
+tarMat_GDSC <- ProcessTargetResults$resTarMat
+viabMat_GDSC <- sanger_mat_forest.scale[rownames(tarMat_GDSC),]
+save(tarMat_GDSC, viabMat_GDSC, ProcessTargetResults_GDSC, file = "../output/inputs_GDSC.RData")
+```
+

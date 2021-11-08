@@ -1,0 +1,138 @@
+---
+title: "Pre-processing GDSC drug screen datasets"
+author: "Junyan Lu"
+date: "2021-10-05"
+output: workflowr::wflow_html
+editor_options:
+  chunk_output_type: inline
+---
+
+# Load packages
+
+Packages
+```{r package, message=FALSE, warning=FALSE}
+library(depInfeR)
+library(RColorBrewer)
+library(pheatmap)
+library(ggbeeswarm)
+library(ggrepel)
+library(tidyverse)
+source("../code/utils.R")
+knitr::opts_chunk$set(dev = c("png","pdf"))
+```
+
+# Load pre-processed datasets
+```{r load beatAML}
+load("../output/inputs_BeatAML.RData")
+```
+
+## Dimensions of input matrices
+
+Drug-target
+```{r}
+dim(tarMat_BeatAML)
+```
+
+Drug-sample (viability matrix)
+```{r}
+dim(viabMat_BeatAML)
+```
+
+# Multivariant model for protein dependence prediction
+
+Perform multivariant LASSO regression based on a drug-protein affinity matrix and a drug response matrix.  
+This chunk can take a long time to run. Therefore we will save the result for later use to save time. 
+```{r lasso beatAML, eval=FALSE}
+result <- runLASSOregression(TargetMatrix = tarMat_BeatAML , ViabMatrix = viabMat_BeatAML, seed = 333)
+
+#remove targets that were never selected
+useTar <- rowSums(result$coefMat) != 0
+result$coefMat <- result$coefMat[useTar,]
+
+
+#save intermediate results
+save(result, file = "../output/BeatAML_result.RData")
+```
+
+Load the saved result
+```{r save}
+load("../output/BeatAML_result.RData")
+```
+
+Number of selected targets
+```{r}
+nrow(result$coefMat)
+```
+
+# Overall target importance
+This plot shows the overall importance of each of the targets. It shows how effective targeting this protein by drugs is in the disease in general and displays the variability between the different samples.
+
+## Colored by FLT3-ITD status
+```{r beatAML_overall, fig.width=15, fig.height=8}
+plotTab <- result$coefMat %>% data.frame() %>%
+  rownames_to_column("target") %>% gather(key = "labID", value = "coef",-target) %>% 
+  group_by(target) %>% mutate(meanCoef = mean(coef)) %>% arrange(meanCoef) %>% ungroup() %>%
+  mutate(target = factor(target, levels = unique(target))) 
+  
+  
+plotTab$labID <- gsub("X","",plotTab$labID)
+plotTab <- mutate(plotTab, FLT3.ITD = annotation_beatAML[labID,]$FLT3.ITD)
+
+ggplot(plotTab, aes(x=target, y = coef)) + geom_boxplot(outlier.shape = NA) + 
+  geom_point(aes(col = FLT3.ITD), alpha =0.5, position=position_jitter(h=0.05, w=0.3)) +
+  scale_color_manual(values= c("negative"= "#0072B5FF", "positive" = "#BC3C29FF"), na.translate=FALSE) + 
+  theme(axis.text.x = element_text(angle = 90, hjust=1, vjust=0.5)) + ylab("target importance coefficient") + xlab("Target") +
+  theme_bw()
+```
+
+# Heatmap plots of target importance matrix
+
+The target importance coefficient matrix can be nicely visualized in a heatmap. The more positive the coefficient, the more essential this target is for the survival of the cancer cell. Values closer to zero indicate a lower importance of that target. Negative coefficient values speak for a target which is beneficial for the cancer cell when absent or inhibited.
+
+## Heatmap of target importance coefficients
+
+```{r beatAML_heatmap, fig.height=6, fig.width=12}
+plotTab <- result$coefMat
+#Row normalization while keeping sign
+plotTab_scaled <- scale(t(plotTab), center = FALSE, scale= TRUE)
+plotTab <- t(plotTab_scaled)
+annoCol <- annotation_beatAML[1:10]
+rownames(annoCol) <- paste0("X", rownames(annoCol))
+
+pheatmap(plotTab, 
+         color=colorRampPalette(rev(brewer.pal(n = 7, name ="RdBu")), bias= 1.2)(100),
+         annotation_col  = annoCol,
+         #annotation_colors = annoColor,
+         clustering_method = "ward.D2", scale = "row", 
+         show_colnames = FALSE, main = "row scaled", fontsize = 6, fontsize_row = 12)
+```
+
+# Differential importance of the targets associated with genotypes
+
+Prepare genomic background table
+```{r}
+sample_anno_final <- dplyr::select(annotation_beatAML, c("FLT3.ITD", "NPM1","CEBPA", "DNMT3A", "IDH1", "IDH2", "KRAS", "NRAS", "RUNX1", "TP53")) %>%
+  as.matrix()
+sample_anno_final[sample_anno_final %in% "positive"] <- 1
+sample_anno_final[sample_anno_final %in% "negative"] <- 0
+
+rownames(sample_anno_final) <- paste0("X", rownames(sample_anno_final))
+sample_anno_final <- as.data.frame(sample_anno_final)
+```
+
+Association test for target importance matrix
+```{r}
+testRes <-  depInfeR::diffImportance(result$coefMat, sample_anno_final)
+```
+
+Boxplot of significant pairs
+```{r}
+pList <- plotDiffBox(testRes, result$coefMat, sample_anno_final, fdrCut = 0.05)
+```
+
+Plot examples of significant associations for supplementary figures
+```{r beatAML_geneAssociations, fig.height=10, fig.width=10}
+cowplot::plot_grid(pList$FLT3_FLT3.ITD, pList$LCK_FLT3.ITD,
+                   pList$MAP2K2_KRAS, pList$MAP2K2_NRAS)
+```
+

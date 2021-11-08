@@ -1,0 +1,214 @@
+---
+title: "Pre-processing CTRP drug screen datasets"
+author: "Junyan Lu"
+date: "2021-10-05"
+output: workflowr::wflow_html
+editor_options:
+  chunk_output_type: inline
+---
+
+# Introduction
+
+**Broad / CTRP v2.1 drug screen:**
+
+Paper: https://www.ncbi.nlm.nih.gov/pmc/articles/PMC4718762/   
+Data download: https://ctd2-data.nci.nih.gov/Public/Broad/CTRPv2.0_2015_ctd2_ExpandedDataset/   
+
+# Load packages
+
+Packages
+```{r message=FALSE, warning=FALSE}
+library(depInfeR)
+library(missForest)
+library(tidyverse)
+source("../code/utils.R")
+```
+
+# Read data sets
+
+## Load pre-processed kinobead table table
+```{r}
+tarList <- readRDS("../output/allTargets.rds")
+```
+
+## Drug screen datasets
+Drug screening data downloaded from:   
+https://ctd2-data.nci.nih.gov/Public/Broad/CTRPv2.1\_2016\_pub\_NatChemBiol\_12\_109/   
+
+As a genetic background of the cancer cell lines, they were annnotated with the mutational status and pathway activity data.    
+
+```{r warning=FALSE}
+# Broad screening data
+Broad <- read.delim("../data/CTRP/v21.data.auc_sensitivities.txt", header = TRUE, sep = "\t", dec = ".")
+
+#cell line annotation
+Broadannot <- read.delim("../data/CTRP/v21.meta.per_cell_line.txt", header = TRUE, sep = "\t", dec = ".",na.strings=c(""," ","NA"))
+Compounds <- read.delim("../data/CTRP/v21.meta.per_compound.txt", header = TRUE, sep = "\t", dec = ".",na.strings=c(""," ","NA"))
+#mutations2 <- read.delim("../data/CTRP/CCLE_DepMap_18q3_maf_20180718.txt", header = TRUE, sep = "\t", dec = ".",na.strings=c(""," ","NA"))
+#cnv <- read.delim("../data/CTRP/v21.data.cnv_avg_log2.txt", header = TRUE, sep = "\t", dec = ".",na.strings=c(""," ","NA"))
+Cell_annot <- read.delim("../data/CTRP/Cell_lines_annotations_20181226.txt", header = TRUE, sep = "\t", dec = ".",na.strings=c(""," ","NA"))
+mutations <- read_csv("../data/CTRP/CCLE_mutations2020Q4.csv")
+
+```
+
+# Preprocess datasets
+
+## Preprocess drug target dataset
+
+In order to apply the regression algorithm both datasets need to be filtered for matching drugs. Therefore, the used drug namings need to be aligned and the datatables need to be filtered for the overlapping drug names. 
+To find as many matching drug names as possible, we firstly add the synonym columns that we found in different tables for each of the datasets to the datatables.
+Secondly, we calculate the Hamming Distance between the drug names (including the synonyms columns) to find matching drug names with only slightly different spelling.
+
+## Preprocess Broad drug screen
+
+```{r}
+#Match IDs to obtain cell line names
+Broad$ccl_name <- Broadannot$ccl_name[match(Broad$master_ccl_id , Broadannot$master_ccl_id)]
+Broad <- Broad[!is.na(Broad$ccl_name),]
+Broad$comp_name <- Compounds$cpd_name[match(Broad$master_cpd_id , Compounds$master_cpd_id)]
+Broad <- Broad[!is.na(Broad$comp_name),]
+mutations$ccl_name <- Cell_annot$Name[match(mutations$DepMap_ID, Cell_annot$depMapID)]
+mutations <- mutations[!is.na(mutations$ccl_name),]
+```
+
+Process drug names of Broad table
+```{r}
+Broad <- dplyr::select(Broad, ccl_name, master_cpd_id, area_under_curve, comp_name)
+
+Broad <- mutate(Broad, comp_name = tolower(comp_name)) %>%
+  mutate(comp_name = gsub("[- ]","", comp_name))
+```
+
+
+# Find overlapping drugs between datasets
+
+Find overlapped drugs by drug names
+```{r}
+overDrug_Broad_name <- intersect(tarList$Drug, Broad$comp_name)
+```
+
+
+Assign manually identified synonyms 
+```{r}
+tarList <- mutate(tarList, Drug = ifelse(Drug=="bms387032", "sns032", Drug))
+tarList <- mutate(tarList, Drug = ifelse(Drug=="galunisertib", "ly2157299", Drug))
+```
+
+Get the final overlapped drug list
+```{r}
+finalList <- intersect(tarList$Drug,Broad$comp_name)
+```
+
+Rename drug column in Broad
+```{r}
+Broad <- dplyr::rename(Broad, Drug = comp_name)
+Broad_druglist <- filter(Broad, !is.na(`Drug`),  !duplicated(Drug))
+```
+
+
+# Create drug-target affinity matrix
+
+Combine the lists
+```{r}
+targets <- left_join(tarList, Broad_druglist, by = "Drug") %>% dplyr::select(Drug, `Target Classification`, EC50,`Apparent Kd`, `Gene Name`) %>%
+  filter(!is.na(Drug)) %>%
+  filter(Drug %in% finalList) 
+```
+
+How many drugs?
+```{r}
+length(unique(targets$Drug))
+```
+
+Change column names
+```{r}
+colnames(targets) <- c("drugName", "targetClassification","EC50","Kd","targetName")
+```
+
+Turn target table into drug-target affinity matrix
+```{r}
+tarMat_kd <- dplyr::filter(targets, targetClassification == "High confidence") %>% 
+    dplyr::select(drugName, targetName, Kd) %>% 
+    spread(key = "targetName", value = "Kd") %>%
+    remove_rownames() %>% column_to_rownames("drugName") %>% as.matrix()
+```
+
+
+As a pre-processing of the drug-protein affinity matrix with kd values (or optionally other affinity measurement values at roughly normal distribution) we chose to perform the following steps:
+
+- log-transform kd values (ifKd = TRUE)
+- arctan-transform log(kd) values (ifKd = TRUE)
+- check target similarity and remove highly correlated targets (ifCorFeat = TRUE)
+
+```{r}
+ProcessTargetResults <- processTarget(tarMat_kd, ifKd = TRUE , ifCorFeat = TRUE)
+```
+
+
+# Prepare response matrix (drug X sample)
+
+## Prepare response matrix using the AUC
+
+The z-score was chosen as a suitable measurement value for our drug screening response matrix as it corresponds to a normalization for each drug over all cell lines. When working with AUC or IC50 values, a suitable normalization of the values is recommended.
+
+
+```{r}
+Broad_viab <- filter(Broad, Drug %in% targets$drugName ) %>%
+  dplyr::select(Drug, ccl_name , area_under_curve) %>% group_by(Drug, ccl_name) %>% 
+  summarise(auc = mean(area_under_curve)) %>%
+  ungroup() 
+
+#create matrix
+Broad_matrix <- Broad_viab %>% 
+  dplyr::select(ccl_name, auc, Drug) %>%
+  tidyr::spread(key = ccl_name, value = auc) %>%
+  remove_rownames() %>% column_to_rownames("Drug") %>%
+  as.matrix()
+```
+As we have some missing values in our response matrix, we check the distribution of our missing values across all cell lines
+
+## Assessment of missing values and remaining cell lines
+```{r}
+missTab <- data.frame(NA_cutoff = character(0), remain_Samples = character(0), stringsAsFactors = FALSE)
+      
+for (i in 0 : 68) {
+  a <- dim(Broad_matrix[,colSums(is.na(Broad_matrix)) <= i])[2]
+  missTab [i,] <- c(i, a)
+}
+#missTab
+plot(missTab, type = "l")
+```
+
+From looking at the missing value distribution, we choose cell lines with a maximum of 15 missing values per cell line (= 22%) as usable for the MissForest imputation method.
+
+## Subset for only complete cell lines --> Use cell lines with less than 15 missing values (based on assessment above)
+```{r}
+Broad_mat_subset <-Broad_matrix[,colSums(is.na(Broad_matrix)) <= 15]
+```
+
+## MissForest imputation
+```{r}
+impRes <- missForest(t(Broad_mat_subset))
+imp_missforest <- impRes$ximp
+
+Broad_mat_forest <- t(imp_missforest)
+colnames(Broad_mat_forest) <- colnames(Broad_mat_subset)
+rownames(Broad_mat_forest) <- rownames(Broad_mat_subset)
+```
+
+# Combine the feature and reponse matrix for regression models
+
+## Column-wise z-score
+```{r}
+#using column-wise Z-score, because we focus more on the effect of different drugs on the same patient sample.
+Broad_mat_forest.scale <- t(mscale(t(Broad_mat_forest)))
+```
+
+# Save pre-processed dataset
+```{r}
+ProcessTargetResults_CTRP <- ProcessTargetResults
+tarMat_CTRP <- ProcessTargetResults$resTarMat
+viabMat_CTRP <- Broad_mat_forest.scale[rownames(tarMat_CTRP),]
+save(tarMat_CTRP, viabMat_CTRP, ProcessTargetResults_CTRP, file = "../output/inputs_CTRP.RData")
+```
+

@@ -1,0 +1,1012 @@
+<!DOCTYPE html>
+
+<html>
+
+<head>
+
+<meta charset="utf-8" />
+<meta name="generator" content="pandoc" />
+<meta http-equiv="X-UA-Compatible" content="IE=EDGE" />
+
+
+<meta name="author" content="Junyan Lu" />
+
+<meta name="date" content="2021-10-05" />
+
+<title>Pre-processing BeatAML drug screen datasets</title>
+
+<script src="site_libs/header-attrs-2.9/header-attrs.js"></script>
+<script src="site_libs/jquery-1.11.3/jquery.min.js"></script>
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<link href="site_libs/bootstrap-3.3.5/css/cosmo.min.css" rel="stylesheet" />
+<script src="site_libs/bootstrap-3.3.5/js/bootstrap.min.js"></script>
+<script src="site_libs/bootstrap-3.3.5/shim/html5shiv.min.js"></script>
+<script src="site_libs/bootstrap-3.3.5/shim/respond.min.js"></script>
+<style>h1 {font-size: 34px;}
+       h1.title {font-size: 38px;}
+       h2 {font-size: 30px;}
+       h3 {font-size: 24px;}
+       h4 {font-size: 18px;}
+       h5 {font-size: 16px;}
+       h6 {font-size: 12px;}
+       code {color: inherit; background-color: rgba(0, 0, 0, 0.04);}
+       pre:not([class]) { background-color: white }</style>
+<script src="site_libs/jqueryui-1.11.4/jquery-ui.min.js"></script>
+<link href="site_libs/tocify-1.9.1/jquery.tocify.css" rel="stylesheet" />
+<script src="site_libs/tocify-1.9.1/jquery.tocify.js"></script>
+<script src="site_libs/navigation-1.1/tabsets.js"></script>
+<link href="site_libs/highlightjs-9.12.0/textmate.css" rel="stylesheet" />
+<script src="site_libs/highlightjs-9.12.0/highlight.js"></script>
+
+<link rel="icon" href="https://github.com/workflowr/workflowr-assets/raw/master/img/reproducible.png">
+<!-- Add a small amount of space between sections. -->
+<style type="text/css">
+div.section {
+  padding-top: 12px;
+}
+</style>
+
+
+
+<style type="text/css">
+  code{white-space: pre-wrap;}
+  span.smallcaps{font-variant: small-caps;}
+  span.underline{text-decoration: underline;}
+  div.column{display: inline-block; vertical-align: top; width: 50%;}
+  div.hanging-indent{margin-left: 1.5em; text-indent: -1.5em;}
+  ul.task-list{list-style: none;}
+    </style>
+
+<style type="text/css">code{white-space: pre;}</style>
+<script type="text/javascript">
+if (window.hljs) {
+  hljs.configure({languages: []});
+  hljs.initHighlightingOnLoad();
+  if (document.readyState && document.readyState === "complete") {
+    window.setTimeout(function() { hljs.initHighlighting(); }, 0);
+  }
+}
+</script>
+
+
+
+
+
+
+
+
+<style type = "text/css">
+.main-container {
+  max-width: 940px;
+  margin-left: auto;
+  margin-right: auto;
+}
+img {
+  max-width:100%;
+}
+.tabbed-pane {
+  padding-top: 12px;
+}
+.html-widget {
+  margin-bottom: 20px;
+}
+button.code-folding-btn:focus {
+  outline: none;
+}
+summary {
+  display: list-item;
+}
+pre code {
+  padding: 0;
+}
+</style>
+
+
+<style type="text/css">
+.dropdown-submenu {
+  position: relative;
+}
+.dropdown-submenu>.dropdown-menu {
+  top: 0;
+  left: 100%;
+  margin-top: -6px;
+  margin-left: -1px;
+  border-radius: 0 6px 6px 6px;
+}
+.dropdown-submenu:hover>.dropdown-menu {
+  display: block;
+}
+.dropdown-submenu>a:after {
+  display: block;
+  content: " ";
+  float: right;
+  width: 0;
+  height: 0;
+  border-color: transparent;
+  border-style: solid;
+  border-width: 5px 0 5px 5px;
+  border-left-color: #cccccc;
+  margin-top: 5px;
+  margin-right: -10px;
+}
+.dropdown-submenu:hover>a:after {
+  border-left-color: #adb5bd;
+}
+.dropdown-submenu.pull-left {
+  float: none;
+}
+.dropdown-submenu.pull-left>.dropdown-menu {
+  left: -100%;
+  margin-left: 10px;
+  border-radius: 6px 0 6px 6px;
+}
+</style>
+
+<script type="text/javascript">
+// manage active state of menu based on current page
+$(document).ready(function () {
+  // active menu anchor
+  href = window.location.pathname
+  href = href.substr(href.lastIndexOf('/') + 1)
+  if (href === "")
+    href = "index.html";
+  var menuAnchor = $('a[href="' + href + '"]');
+
+  // mark it active
+  menuAnchor.tab('show');
+
+  // if it's got a parent navbar menu mark it active as well
+  menuAnchor.closest('li.dropdown').addClass('active');
+
+  // Navbar adjustments
+  var navHeight = $(".navbar").first().height() + 15;
+  var style = document.createElement('style');
+  var pt = "padding-top: " + navHeight + "px; ";
+  var mt = "margin-top: -" + navHeight + "px; ";
+  var css = "";
+  // offset scroll position for anchor links (for fixed navbar)
+  for (var i = 1; i <= 6; i++) {
+    css += ".section h" + i + "{ " + pt + mt + "}\n";
+  }
+  style.innerHTML = "body {" + pt + "padding-bottom: 40px; }\n" + css;
+  document.head.appendChild(style);
+});
+</script>
+
+<!-- tabsets -->
+
+<style type="text/css">
+.tabset-dropdown > .nav-tabs {
+  display: inline-table;
+  max-height: 500px;
+  min-height: 44px;
+  overflow-y: auto;
+  border: 1px solid #ddd;
+  border-radius: 4px;
+}
+
+.tabset-dropdown > .nav-tabs > li.active:before {
+  content: "";
+  font-family: 'Glyphicons Halflings';
+  display: inline-block;
+  padding: 10px;
+  border-right: 1px solid #ddd;
+}
+
+.tabset-dropdown > .nav-tabs.nav-tabs-open > li.active:before {
+  content: "&#xe258;";
+  border: none;
+}
+
+.tabset-dropdown > .nav-tabs.nav-tabs-open:before {
+  content: "";
+  font-family: 'Glyphicons Halflings';
+  display: inline-block;
+  padding: 10px;
+  border-right: 1px solid #ddd;
+}
+
+.tabset-dropdown > .nav-tabs > li.active {
+  display: block;
+}
+
+.tabset-dropdown > .nav-tabs > li > a,
+.tabset-dropdown > .nav-tabs > li > a:focus,
+.tabset-dropdown > .nav-tabs > li > a:hover {
+  border: none;
+  display: inline-block;
+  border-radius: 4px;
+  background-color: transparent;
+}
+
+.tabset-dropdown > .nav-tabs.nav-tabs-open > li {
+  display: block;
+  float: none;
+}
+
+.tabset-dropdown > .nav-tabs > li {
+  display: none;
+}
+</style>
+
+<!-- code folding -->
+
+
+
+<style type="text/css">
+
+#TOC {
+  margin: 25px 0px 20px 0px;
+}
+@media (max-width: 768px) {
+#TOC {
+  position: relative;
+  width: 100%;
+}
+}
+
+@media print {
+.toc-content {
+  /* see https://github.com/w3c/csswg-drafts/issues/4434 */
+  float: right;
+}
+}
+
+.toc-content {
+  padding-left: 30px;
+  padding-right: 40px;
+}
+
+div.main-container {
+  max-width: 1200px;
+}
+
+div.tocify {
+  width: 20%;
+  max-width: 260px;
+  max-height: 85%;
+}
+
+@media (min-width: 768px) and (max-width: 991px) {
+  div.tocify {
+    width: 25%;
+  }
+}
+
+@media (max-width: 767px) {
+  div.tocify {
+    width: 100%;
+    max-width: none;
+  }
+}
+
+.tocify ul, .tocify li {
+  line-height: 20px;
+}
+
+.tocify-subheader .tocify-item {
+  font-size: 0.90em;
+}
+
+.tocify .list-group-item {
+  border-radius: 0px;
+}
+
+
+</style>
+
+
+
+</head>
+
+<body>
+
+
+<div class="container-fluid main-container">
+
+
+<!-- setup 3col/9col grid for toc_float and main content  -->
+<div class="row">
+<div class="col-xs-12 col-sm-4 col-md-3">
+<div id="TOC" class="tocify">
+</div>
+</div>
+
+<div class="toc-content col-xs-12 col-sm-8 col-md-9">
+
+
+
+
+<div class="navbar navbar-default  navbar-fixed-top" role="navigation">
+  <div class="container">
+    <div class="navbar-header">
+      <button type="button" class="navbar-toggle collapsed" data-toggle="collapse" data-target="#navbar">
+        <span class="icon-bar"></span>
+        <span class="icon-bar"></span>
+        <span class="icon-bar"></span>
+      </button>
+      <a class="navbar-brand" href="index.html">DepInfeR</a>
+    </div>
+    <div id="navbar" class="navbar-collapse collapse">
+      <ul class="nav navbar-nav">
+        <li>
+  <a href="index.html">Home</a>
+</li>
+      </ul>
+      <ul class="nav navbar-nav navbar-right">
+        
+      </ul>
+    </div><!--/.nav-collapse -->
+  </div><!--/.container -->
+</div><!--/.navbar -->
+
+<div id="header">
+
+
+
+<h1 class="title toc-ignore">Pre-processing BeatAML drug screen datasets</h1>
+<h4 class="author">Junyan Lu</h4>
+<h4 class="date">2021-10-05</h4>
+
+</div>
+
+
+<p>
+<button type="button" class="btn btn-default btn-workflowr btn-workflowr-report" data-toggle="collapse" data-target="#workflowr-report">
+<span class="glyphicon glyphicon-list" aria-hidden="true"></span> workflowr <span class="glyphicon glyphicon-exclamation-sign text-danger" aria-hidden="true"></span>
+</button>
+</p>
+<div id="workflowr-report" class="collapse">
+<ul class="nav nav-tabs">
+<li class="active">
+<a data-toggle="tab" href="#summary">Summary</a>
+</li>
+<li>
+<a data-toggle="tab" href="#checks"> Checks <span class="glyphicon glyphicon-exclamation-sign text-danger" aria-hidden="true"></span> </a>
+</li>
+<li>
+<a data-toggle="tab" href="#versions">Past versions</a>
+</li>
+</ul>
+<div class="tab-content">
+<div id="summary" class="tab-pane fade in active">
+<p>
+<strong>Last updated:</strong> 2021-11-05
+</p>
+<p>
+<strong>Checks:</strong> <span class="glyphicon glyphicon-ok text-success" aria-hidden="true"></span> 6 <span class="glyphicon glyphicon-exclamation-sign text-danger" aria-hidden="true"></span> 1
+</p>
+<p>
+<strong>Knit directory:</strong> <code>DepInfeR/analysis/</code> <span class="glyphicon glyphicon-question-sign" aria-hidden="true" title="This is the local directory in which the code in this file was executed."> </span>
+</p>
+<p>
+This reproducible <a href="http://rmarkdown.rstudio.com">R Markdown</a> analysis was created with <a
+  href="https://github.com/jdblischak/workflowr">workflowr</a> (version 1.6.2). The <em>Checks</em> tab describes the reproducibility checks that were applied when the results were created. The <em>Past versions</em> tab lists the development history.
+</p>
+<hr>
+</div>
+<div id="checks" class="tab-pane fade">
+<div id="workflowr-checks" class="panel-group">
+<div class="panel panel-default">
+<div class="panel-heading">
+<p class="panel-title">
+<a data-toggle="collapse" data-parent="#workflowr-checks" href="#strongRMarkdownfilestronguncommittedchanges"> <span class="glyphicon glyphicon-exclamation-sign text-danger" aria-hidden="true"></span> <strong>R Markdown file:</strong> uncommitted changes </a>
+</p>
+</div>
+<div id="strongRMarkdownfilestronguncommittedchanges" class="panel-collapse collapse">
+<div class="panel-body">
+<p>The R Markdown is untracked by Git. To know which version of the R Markdown file created these results, you’ll want to first commit it to the Git repo. If you’re still working on the analysis, you can ignore this warning. When you’re finished, you can run <code>wflow_publish</code> to commit the R Markdown file and build the HTML.</p>
+</div>
+</div>
+</div>
+<div class="panel panel-default">
+<div class="panel-heading">
+<p class="panel-title">
+<a data-toggle="collapse" data-parent="#workflowr-checks" href="#strongEnvironmentstrongempty"> <span class="glyphicon glyphicon-ok text-success" aria-hidden="true"></span> <strong>Environment:</strong> empty </a>
+</p>
+</div>
+<div id="strongEnvironmentstrongempty" class="panel-collapse collapse">
+<div class="panel-body">
+<p>Great job! The global environment was empty. Objects defined in the global environment can affect the analysis in your R Markdown file in unknown ways. For reproduciblity it’s best to always run the code in an empty environment.</p>
+</div>
+</div>
+</div>
+<div class="panel panel-default">
+<div class="panel-heading">
+<p class="panel-title">
+<a data-toggle="collapse" data-parent="#workflowr-checks" href="#strongSeedstrongcodesetseed20211005code"> <span class="glyphicon glyphicon-ok text-success" aria-hidden="true"></span> <strong>Seed:</strong> <code>set.seed(20211005)</code> </a>
+</p>
+</div>
+<div id="strongSeedstrongcodesetseed20211005code" class="panel-collapse collapse">
+<div class="panel-body">
+<p>The command <code>set.seed(20211005)</code> was run prior to running the code in the R Markdown file. Setting a seed ensures that any results that rely on randomness, e.g. subsampling or permutations, are reproducible.</p>
+</div>
+</div>
+</div>
+<div class="panel panel-default">
+<div class="panel-heading">
+<p class="panel-title">
+<a data-toggle="collapse" data-parent="#workflowr-checks" href="#strongSessioninformationstrongrecorded"> <span class="glyphicon glyphicon-ok text-success" aria-hidden="true"></span> <strong>Session information:</strong> recorded </a>
+</p>
+</div>
+<div id="strongSessioninformationstrongrecorded" class="panel-collapse collapse">
+<div class="panel-body">
+<p>Great job! Recording the operating system, R version, and package versions is critical for reproducibility.</p>
+</div>
+</div>
+</div>
+<div class="panel panel-default">
+<div class="panel-heading">
+<p class="panel-title">
+<a data-toggle="collapse" data-parent="#workflowr-checks" href="#strongCachestrongnone"> <span class="glyphicon glyphicon-ok text-success" aria-hidden="true"></span> <strong>Cache:</strong> none </a>
+</p>
+</div>
+<div id="strongCachestrongnone" class="panel-collapse collapse">
+<div class="panel-body">
+<p>Nice! There were no cached chunks for this analysis, so you can be confident that you successfully produced the results during this run.</p>
+</div>
+</div>
+</div>
+<div class="panel panel-default">
+<div class="panel-heading">
+<p class="panel-title">
+<a data-toggle="collapse" data-parent="#workflowr-checks" href="#strongFilepathsstrongrelative"> <span class="glyphicon glyphicon-ok text-success" aria-hidden="true"></span> <strong>File paths:</strong> relative </a>
+</p>
+</div>
+<div id="strongFilepathsstrongrelative" class="panel-collapse collapse">
+<div class="panel-body">
+<p>Great job! Using relative paths to the files within your workflowr project makes it easier to run your code on other machines.</p>
+</div>
+</div>
+</div>
+<div class="panel panel-default">
+<div class="panel-heading">
+<p class="panel-title">
+<a data-toggle="collapse" data-parent="#workflowr-checks" href="#strongRepositoryversionstrong43be8a7"> <span class="glyphicon glyphicon-ok text-success" aria-hidden="true"></span> <strong>Repository version:</strong> 43be8a7 </a>
+</p>
+</div>
+<div id="strongRepositoryversionstrong43be8a7" class="panel-collapse collapse">
+<div class="panel-body">
+<p>
+Great! You are using Git for version control. Tracking code development and connecting the code version to the results is critical for reproducibility.
+</p>
+<p>
+The results in this page were generated with repository version 43be8a7. See the <em>Past versions</em> tab to see a history of the changes made to the R Markdown and HTML files.
+</p>
+<p>
+Note that you need to be careful to ensure that all relevant files for the analysis have been committed to Git prior to generating the results (you can use <code>wflow_publish</code> or <code>wflow_git_commit</code>). workflowr only checks the R Markdown file, but you know if there are other scripts or data files that it depends on. Below is the status of the Git repository when the results were generated:
+</p>
+<pre><code>
+Ignored files:
+    Ignored:    .DS_Store
+    Ignored:    .Rhistory
+    Ignored:    .Rproj.user/
+    Ignored:    analysis/.DS_Store
+    Ignored:    analysis/.Rhistory
+    Ignored:    analysis/analysis_RNAseq_cache/
+    Ignored:    analysis/figure/
+    Ignored:    data/.DS_Store
+    Ignored:    output/.DS_Store
+
+Untracked files:
+    Untracked:  analysis/analysis_EMBL2016.Rmd
+    Untracked:  analysis/analysis_GDSC.Rmd
+    Untracked:  analysis/analysis_RNAseq.Rmd
+    Untracked:  analysis/analysis_beatAML.Rmd
+    Untracked:  analysis/process_EMBL2016.Rmd
+    Untracked:  analysis/process_GDSC.Rmd
+    Untracked:  analysis/process_beatAML.Rmd
+    Untracked:  analysis/process_kinobeads.Rmd
+    Untracked:  code/utils.R
+    Untracked:  data/BeatAML/
+    Untracked:  data/EMBL2016/
+    Untracked:  data/GDSC/
+    Untracked:  data/Kinobeads/
+    Untracked:  data/RNAseq/
+    Untracked:  manuscript/
+    Untracked:  output/BeatAML_result.RData
+    Untracked:  output/EMBL_result.RData
+    Untracked:  output/EMBL_resultSub.RData
+    Untracked:  output/GDSC_result.RData
+    Untracked:  output/allTargets.rds
+    Untracked:  output/inputs_BeatAML.RData
+    Untracked:  output/inputs_EMBL.RData
+    Untracked:  output/inputs_GDSC.RData
+
+Unstaged changes:
+    Modified:   README.md
+    Modified:   _workflowr.yml
+    Modified:   analysis/_site.yml
+    Deleted:    analysis/about.Rmd
+    Modified:   analysis/index.Rmd
+    Deleted:    analysis/license.Rmd
+    Deleted:    output/README.md
+
+</code></pre>
+<p>
+Note that any generated files, e.g. HTML, png, CSS, etc., are not included in this status report because it is ok for generated content to have uncommitted changes.
+</p>
+</div>
+</div>
+</div>
+</div>
+<hr>
+</div>
+<div id="versions" class="tab-pane fade">
+<p>
+There are no past versions. Publish this analysis with <code>wflow_publish()</code> to start tracking its development.
+</p>
+<hr>
+</div>
+</div>
+</div>
+<div id="introduction" class="section level1">
+<h1>Introduction</h1>
+<p>Paper: <a href="https://www.nature.com/articles/s41586-018-0623-z" class="uri">https://www.nature.com/articles/s41586-018-0623-z</a><br />
+Data download: <a href="https://ctd2-data.nci.nih.gov/Public/OHSU-1/BeatAML_Waves1_2/" class="uri">https://ctd2-data.nci.nih.gov/Public/OHSU-1/BeatAML_Waves1_2/</a></p>
+<hr />
+</div>
+<div id="load-packages" class="section level1">
+<h1>Load packages</h1>
+<p>Packages</p>
+<pre class="r"><code>library(depInfeR)
+library(missForest)
+library(DESeq2)
+library(tidyverse)
+source(&quot;../code/utils.R&quot;)
+knitr::opts_chunk$set(dev = c(&quot;png&quot;,&quot;pdf&quot;))</code></pre>
+</div>
+<div id="read-data-sets" class="section level1">
+<h1>Read data sets</h1>
+<p>Load pre-processed kinobead table table</p>
+<pre class="r"><code>tarList &lt;- readRDS(&quot;../output/allTargets.rds&quot;)</code></pre>
+<p>Read in BeatAML raw drug screen datasets</p>
+<pre class="r"><code># BeatAML screening data
+beatAML &lt;- read.delim(&quot;../data/BeatAML/OHSU_BeatAMLWaves1_2_Tyner_DrugResponse.txt&quot;, header = TRUE, sep = &quot;\t&quot;, dec = &quot;.&quot;)
+
+# clinical data annotation
+beatAMLannot &lt;- read.delim(&quot;../data/BeatAML/OHSU_BeatAMLWaves1_2_Tyner_ClinicalSummary.txt&quot;, 
+                           header = TRUE, sep = &quot;\t&quot;, dec = &quot;.&quot;,na.strings=c(&quot;&quot;,&quot; &quot;,&quot;NA&quot;))
+
+# RNA Seq raw counts
+BeatAMLcounts &lt;- read_csv(&quot;../data/BeatAML/BeatAML_RNASeq_rawcounts_2018_10_24.csv.gz&quot;)</code></pre>
+<pre><code>Rows: 63677 Columns: 503</code></pre>
+<pre><code>── Column specification ────────────────────────────────────────────────────────
+Delimiter: &quot;,&quot;
+chr   (6): Gene, Symbol, Chr, Exon_Start, Exon_End, Strand
+dbl (497): Length, GeneStart, GeneEnd, 12-00023, 12-00051, 12-00066, 12-0015...</code></pre>
+<pre><code>
+ℹ Use `spec()` to retrieve the full column specification for this data.
+ℹ Specify the column types or set `show_col_types = FALSE` to quiet this message.</code></pre>
+</div>
+<div id="preprocess-datasets" class="section level1">
+<h1>Preprocess datasets</h1>
+<div id="preprocess-beataml-drug-screen" class="section level2">
+<h2>Preprocess BeatAML drug screen</h2>
+<p>Process drug names of BeatAML table</p>
+<pre class="r"><code>beatAML &lt;- mutate(beatAML, inhibitor = tolower(inhibitor)) %&gt;%
+  mutate(inhibitor = gsub(&quot;[- ]&quot;,&quot;&quot;, inhibitor))
+beatAML &lt;- separate(data = beatAML, col = inhibitor, into = c(&quot;inhibitor&quot;, &quot;synonym&quot;), sep = &quot;\\(&quot;) %&gt;% mutate(synonym = gsub(&quot;\\)&quot;, &quot;&quot;, synonym)) </code></pre>
+<pre><code>Warning: Expected 2 pieces. Missing pieces filled with `NA` in 30103 rows [422,
+423, 424, 425, 426, 427, 428, 429, 430, 431, 432, 433, 434, 435, 436, 437, 438,
+439, 440, 441, ...].</code></pre>
+</div>
+<div id="find-overlapping-drugs-between-datasets" class="section level2">
+<h2>Find overlapping drugs between datasets</h2>
+<p>Find overlapped drugs by drug names</p>
+<pre class="r"><code>overDrug_AML_name &lt;- intersect(tarList$Drug, beatAML$inhibitor)</code></pre>
+</div>
+<div id="calculate-hamming-distance-between-drug-names-and-consider-synonyms-to-find-more-overlapping-drugs" class="section level2">
+<h2>Calculate Hamming distance between drug names and consider synonyms to find more overlapping drugs</h2>
+<p>Filter AML for not found</p>
+<pre class="r"><code>missDrug &lt;- setdiff(unique(beatAML$inhibitor), overDrug_AML_name)
+notFoundAML &lt;- filter(beatAML, inhibitor %in% missDrug)</code></pre>
+<p>Filter targetlist for not found</p>
+<pre class="r"><code>missTarget &lt;- setdiff(unique(tarList$Drug),overDrug_AML_name)
+notFoundTarget &lt;- filter(tarList, Drug %in% missTarget)</code></pre>
+<p>Modify the name in target table after manual inspection of synonyms</p>
+<pre class="r"><code>tarList &lt;- mutate(tarList, Drug = ifelse(Drug==&quot;ruboxistaurin&quot;, &quot;ly333531&quot;, Drug))
+tarList &lt;- mutate(tarList, Drug = ifelse(Drug==&quot;bms387032&quot;, &quot;sns032&quot;, Drug))</code></pre>
+<p>Get the final overlapped drug list</p>
+<pre class="r"><code>finalList &lt;- intersect(tarList$Drug,beatAML$inhibitor)</code></pre>
+<p>Rename drug column in BeatAML</p>
+<pre class="r"><code>beatAML &lt;- dplyr::rename(beatAML, Drug = inhibitor)
+beatAML_druglist &lt;- filter(beatAML, !is.na(`Drug`),  !duplicated(Drug))</code></pre>
+</div>
+<div id="match-drug-ids-and-create-drug-target-affinity-matrix" class="section level2">
+<h2>Match drug IDs and create drug-target affinity matrix</h2>
+<p>Combine the lists</p>
+<pre class="r"><code>targets &lt;- left_join(tarList, beatAML_druglist, by = &quot;Drug&quot;) %&gt;% dplyr::select(Drug, `Target Classification`, EC50,`Apparent Kd`, `Gene Name`) %&gt;% filter(!is.na(Drug)) %&gt;% filter(Drug %in% finalList) </code></pre>
+<p>How many drugs?</p>
+<pre class="r"><code>length(unique(targets$Drug))</code></pre>
+<pre><code>[1] 62</code></pre>
+</div>
+<div id="remove-targets-that-are-not-expressed-in-patients" class="section level2">
+<h2>Remove targets that are not expressed in patients</h2>
+<p>Get count values from RNAseq</p>
+<pre class="r"><code>BeatAML_expr &lt;- dplyr::select(BeatAMLcounts, -c(Gene, Chr, Exon_Start, Exon_End, Strand, Length, GeneStart, GeneEnd)) 
+
+# remove duplicates
+BeatAML_expr &lt;- BeatAML_expr[!duplicated(BeatAML_expr$Symbol),] %&gt;% column_to_rownames(&quot;Symbol&quot;)
+BeatAML_expr &lt;- data.matrix(BeatAML_expr) 
+
+#create DeSeq Dataset
+coldata &lt;- beatAMLannot %&gt;% filter(LabId %in% colnames(BeatAML_expr)) 
+BeatAML_expr &lt;- BeatAML_expr[, colnames(BeatAML_expr) %in% beatAMLannot$LabId]
+BeatAML_expr &lt;- BeatAML_expr[,order(colnames(BeatAML_expr))]
+coldata &lt;- coldata %&gt;% column_to_rownames(&quot;LabId&quot;)
+coldata &lt;- coldata[order(rownames(coldata)),]
+dds &lt;- DESeqDataSetFromMatrix(countData = BeatAML_expr,
+                                 colData = coldata,
+                                 design = ~ 1)</code></pre>
+<pre><code>converting counts to integer mode</code></pre>
+<pre class="r"><code>#estimate size factors
+dds &lt;- estimateSizeFactors(dds)
+
+#targets that are not in RNAseq dataset
+setdiff(unique(targets$`Gene Name`), rownames(dds))</code></pre>
+<pre><code> [1] &quot;CSNK2A1;CSNK2A3&quot;                                            
+ [2] &quot;PDPK1;PDPK2P&quot;                                               
+ [3] &quot;BRD4;BRD3&quot;                                                  
+ [4] &quot;BCR/ABL&quot;                                                    
+ [5] &quot;Q6ZSR9&quot;                                                     
+ [6] &quot;ZAK&quot;                                                        
+ [7] &quot;FAM58A;FAM58BP&quot;                                             
+ [8] &quot;MOB1A;MOB1B&quot;                                                
+ [9] &quot;STK26&quot;                                                      
+[10] &quot;PRKX;PRKY&quot;                                                  
+[11] &quot;HIST2H2BE;HIST1H2BB;HIST1H2BO;HIST1H2BJ;HIST3H2BB;HIST1H2BA&quot;
+[12] &quot;DDT;DDTL&quot;                                                   </code></pre>
+<pre class="r"><code>#actually two genes have different gene names used.
+symbolMap &lt;- c(&quot;BRD4;BRD3&quot; =&quot;BRD3&quot;, ZAK = &quot;MAP3K20&quot;, &quot;CSNK2A1;CSNK2A3&quot; = &quot;CSNK2A1&quot;, &quot;PDPK1;PDPK2P&quot; = &quot;PDPK1&quot;, &quot;BRD4;BRD3&quot; = &quot;BRD3&quot;, &quot;FAM58A;FAM58BP&quot; = &quot;FAM58A&quot;, &quot;MOB1A;MOB1B&quot; = &quot;MOB1A&quot;, &quot;PRKX;PRKY&quot; = &quot;PRKX&quot;, &quot;DDT;DDTL&quot; = &quot;DDT&quot; )
+targets &lt;- mutate(targets, `Gene Name` = ifelse(`Gene Name` %in% names(symbolMap),
+                                  symbolMap[`Gene Name`],
+                                  `Gene Name`))
+
+#get count data
+targetCount &lt;- dds[rownames(dds)  %in% targets$`Gene Name`,colnames(dds) %in% beatAMLannot$LabId]
+
+#check again
+setdiff(unique(targets$`Gene Name`), rownames(targetCount)) #some genes are indeed not in RNAseq dataset</code></pre>
+<pre><code>[1] &quot;BCR/ABL&quot;                                                    
+[2] &quot;Q6ZSR9&quot;                                                     
+[3] &quot;MAP3K20&quot;                                                    
+[4] &quot;STK26&quot;                                                      
+[5] &quot;HIST2H2BE;HIST1H2BB;HIST1H2BO;HIST1H2BJ;HIST3H2BB;HIST1H2BA&quot;</code></pre>
+<p>Plot the expression values</p>
+<pre class="r"><code>#prepare plot tab
+plotTab &lt;- data.frame(counts(targetCount, normalized = FALSE)) %&gt;% 
+  rownames_to_column(&quot;ID&quot;) %&gt;%
+  mutate(symbol = rownames(targetCount)) %&gt;%
+  gather(key = &quot;patID&quot;, value = &quot;counts&quot;, -symbol, -ID)
+
+#deal with one gene, multiple transcript problem
+#only keep the most aboundant transcript
+transTab &lt;- group_by(plotTab, ID, symbol) %&gt;% summarize(total = sum(counts)) %&gt;%
+  ungroup() %&gt;%
+  arrange(desc(total)) %&gt;% distinct(symbol, .keep_all = TRUE)</code></pre>
+<pre><code>`summarise()` has grouped output by &#39;ID&#39;. You can override using the `.groups` argument.</code></pre>
+<pre class="r"><code>plotTab &lt;- filter(plotTab, ID %in% transTab$ID)
+
+
+#get the 80% quantile expression value
+exprMed &lt;- group_by(plotTab, symbol) %&gt;% summarise(avgCount = quantile(counts,0.8)) %&gt;%
+   arrange(avgCount) %&gt;% top_n(-50, avgCount)
+
+#only plot the 50 lowest expressed genes
+plotTab &lt;- filter(plotTab, symbol %in% exprMed$symbol) %&gt;%
+  mutate(symbol = factor(symbol, levels = exprMed$symbol))
+
+ggplot(plotTab, aes(x= symbol, y = counts)) + geom_boxplot() +
+  theme_bw() + theme(axis.text.x = element_text(angle = 90, hjust =1, vjust =.5))  + ylim(0, 5000)</code></pre>
+<pre><code>Warning: Removed 26 rows containing non-finite values (stat_boxplot).</code></pre>
+<p><img src="figure/process_beatAML.Rmd/unnamed-chunk-14-1.png" width="960" style="display: block; margin: auto;" /></p>
+<p>Removed the targets that are not expressed in AML samples</p>
+<pre class="r"><code>#80% quantile &lt; 10
+geneRemove &lt;- filter(exprMed, rank(avgCount) / n() &lt; 0.8)
+geneRemove &lt;- filter(exprMed,avgCount &lt; 10)$symbol
+targets &lt;- filter(targets, !`Gene Name` %in% geneRemove)</code></pre>
+<p>Change column names</p>
+<pre class="r"><code>colnames(targets) &lt;- c(&quot;drugName&quot;, &quot;targetClassification&quot;,&quot;EC50&quot;,&quot;Kd&quot;,&quot;targetName&quot;)</code></pre>
+<p>Turn target table into drug-target affinity matrix</p>
+<pre class="r"><code>tarMat_kd &lt;- dplyr::filter(targets, targetClassification == &quot;High confidence&quot;) %&gt;% 
+    dplyr::select(drugName, targetName, Kd) %&gt;% 
+    spread(key = &quot;targetName&quot;, value = &quot;Kd&quot;) %&gt;%
+    remove_rownames() %&gt;% column_to_rownames(&quot;drugName&quot;) %&gt;% as.matrix()</code></pre>
+<p>As a pre-processing of the drug-protein affinity matrix with kd values (or optionally other affinity measurement values at roughly normal distribution) we chose to perform the following steps:</p>
+<ul>
+<li>log-transform kd values (ifKd = TRUE)</li>
+<li>arctan-transform log(kd) values (ifKd = TRUE)</li>
+<li>check target similarity and remove highly correlated targets (ifCorFeat = TRUE)</li>
+</ul>
+<pre class="r"><code>ProcessTargetResults &lt;- processTarget(tarMat_kd, ifKd = TRUE , ifCorFeat = TRUE)</code></pre>
+<pre class="r"><code>load(&quot;../output/BeatAML_result.RData&quot;)
+CancerxTargets&lt;- rowSums(result$freqMat)
+CancerxTargets &lt;- names(CancerxTargets[CancerxTargets&gt;0])
+plotTarGroups(ProcessTargetResults, CancerxTargets)</code></pre>
+<p><img src="figure/process_beatAML.Rmd/tarNet_beatAML-1.png" width="672" style="display: block; margin: auto;" /></p>
+</div>
+</div>
+<div id="prepare-response-matrix-drug-x-sample" class="section level1">
+<h1>Prepare response matrix (drug X sample)</h1>
+<div id="prepare-response-matrix-using-the-auc" class="section level2">
+<h2>Prepare response matrix using the AUC</h2>
+<p>The z-score was chosen as a suitable measurement value for our drug screening response matrix as it corresponds to a normalization for each drug over all cell lines. When working with AUC or IC50 values, a suitable normalization of the values is recommended.</p>
+<pre class="r"><code>BeatAML_viab &lt;- filter(beatAML, Drug %in% targets$drugName) %&gt;%
+  dplyr::select(Drug, lab_id , ic50, auc)
+# filter out multiple samples per patient
+beatAMLannot &lt;- beatAMLannot[!duplicated(beatAMLannot$PatientId), ]
+BeatAML_viab_subs &lt;- subset(BeatAML_viab, rownames(BeatAML_viab) %in% rownames(beatAMLannot))
+
+#create matrix
+BeatAML_matrix &lt;- BeatAML_viab %&gt;% dplyr::select(Drug, lab_id, auc) %&gt;% 
+  tidyr::spread(key = lab_id, value = auc) %&gt;%
+  remove_rownames() %&gt;% column_to_rownames(&quot;Drug&quot;) %&gt;%
+  as.matrix()</code></pre>
+</div>
+<div id="assessment-of-missing-values-and-remaining-samples" class="section level2">
+<h2>Assessment of missing values and remaining samples</h2>
+<pre class="r"><code>missTab &lt;- data.frame(NA_cutoff = character(0), remain_Samples = character(0), stringsAsFactors = FALSE)
+      
+for (i in 0 : 138) {
+  a &lt;- dim(BeatAML_matrix[,colSums(is.na(BeatAML_matrix)) &lt;= i])[2]
+  missTab [i,] &lt;- c(i, a)
+}
+#missTab
+plot(missTab, type = &quot;l&quot;)</code></pre>
+<p><img src="figure/process_beatAML.Rmd/unnamed-chunk-20-1.png" width="672" style="display: block; margin: auto;" /></p>
+<p>From looking at the missing value distribution, we choose cell lines with a maximum of 15 missing values per cell line (= 24%) as usable for the MissForest imputation method.</p>
+</div>
+<div id="subset-for-only-complete-cell-lines-use-cell-lines-with-less-than-15-missing-values-based-on-assessment-above" class="section level2">
+<h2>Subset for only complete cell lines –&gt; Use cell lines with less than 15 missing values (based on assessment above)</h2>
+<pre class="r"><code>BeatAML_mat_subset &lt;- BeatAML_matrix[,colSums(is.na(BeatAML_matrix)) &lt;= 15]</code></pre>
+</div>
+<div id="missforest-imputation" class="section level2">
+<h2>MissForest imputation</h2>
+<pre class="r"><code>impRes &lt;- missForest(t(BeatAML_mat_subset))</code></pre>
+<pre><code>  missForest iteration 1 in progress...done!
+  missForest iteration 2 in progress...done!
+  missForest iteration 3 in progress...done!
+  missForest iteration 4 in progress...done!
+  missForest iteration 5 in progress...done!
+  missForest iteration 6 in progress...done!
+  missForest iteration 7 in progress...done!</code></pre>
+<pre class="r"><code>imp_missforest &lt;- impRes$ximp
+
+BeatAML_mat_forest &lt;- t(imp_missforest)
+colnames(BeatAML_mat_forest) &lt;- colnames(BeatAML_mat_subset)
+rownames(BeatAML_mat_forest) &lt;- rownames(BeatAML_mat_subset)</code></pre>
+</div>
+<div id="calculate-column-wise-z-score" class="section level2">
+<h2>Calculate column-wise z-score</h2>
+<pre class="r"><code>#using column-wise Z-score, because we focus more on the effect of different drugs on the same patient sample.
+BeatAML_mat_forest.scale &lt;- t(mscale(t(BeatAML_mat_forest)))</code></pre>
+</div>
+</div>
+<div id="prepare-sample-annotation" class="section level1">
+<h1>Prepare sample annotation</h1>
+<div id="annotation-table-with-samples-and-percentage-of-missing-values" class="section level2">
+<h2>Annotation table with samples and percentage of missing values</h2>
+<pre class="r"><code>annoTab_missval &lt;- data.frame(sample = character(0), missing_value_perc= numeric(0), stringsAsFactors = FALSE)
+missinglist &lt;- colSums(is.na(BeatAML_mat_subset))
+for (i in 1 : length(BeatAML_mat_forest[1,])) {
+  a &lt;- round((missinglist[i] / length(BeatAML_mat_forest[,1]))*100, 1)
+  annoTab_missval [i,] &lt;- c(colnames(BeatAML_mat_subset)[i], a)
+}
+annoTab_missval$missing_value_perc &lt;- as.numeric(annoTab_missval$missing_value_perc)
+annoTab_missval &lt;- annoTab_missval %&gt;% mutate(sample = gsub(&quot;[- ]&quot;,&quot;.&quot;,sample)) 
+
+annoTab_missval &lt;- annoTab_missval %&gt;%
+  data.frame() %&gt;% remove_rownames() %&gt;%
+  column_to_rownames(&quot;sample&quot;) </code></pre>
+</div>
+<div id="sample-annotation-table" class="section level2">
+<h2>Sample annotation table</h2>
+<pre class="r"><code>sample_annot &lt;- dplyr::select(beatAMLannot,1:2, 88:159) %&gt;% distinct(LabId, .keep_all = TRUE) %&gt;% mutate_if(is.factor, as.character)  %&gt;% column_to_rownames(&quot;LabId&quot;) 
+rownames(sample_annot) &lt;- gsub(&quot;-&quot;,&quot;.&quot;,rownames(sample_annot))
+rownames(sample_annot) &lt;- gsub(&quot; &quot;,&quot;.&quot;,rownames(sample_annot))
+
+sample_annot[sample_annot!=&quot;negative&quot;] &lt;- &quot;positive&quot;
+
+sample_annot &lt;- sample_annot[, colSums(sample_annot == &quot;positive&quot;, na.rm=TRUE) &gt; 3]
+
+sample_annotation &lt;- merge(annoTab_missval, sample_annot, all.x=T, by=&#39;row.names&#39;) %&gt;% column_to_rownames(&quot;Row.names&quot;)
+sample_annotation$SF3B1 &lt;- sample_annotation$SF3B1 %&gt;% replace_na(&quot;negative&quot;)
+sample_annotation$KMT2A &lt;- sample_annotation$KMT2A %&gt;% replace_na(&quot;negative&quot;)
+sample_annotation$BCOR &lt;- sample_annotation$BCOR %&gt;% replace_na(&quot;negative&quot;)
+sample_annotation$ASXL1 &lt;- sample_annotation$ASXL1 %&gt;% replace_na(&quot;negative&quot;)
+
+# Annotation with BTK cluster status from Paper
+Ibrutinib_sensitive &lt;- c(&quot;15.00269&quot;,&quot;15.00383&quot;,&quot;16.00102&quot;,&quot;15.00482&quot;,&quot;16.00831&quot;,&quot;15.00556&quot;,&quot;15.00593&quot;,&quot;15.00417&quot;,&quot;16.00120&quot;,&quot;16.00078&quot;,&quot;15.00680&quot;,&quot;16.01017&quot;, &quot;16.00027&quot;,&quot;15.00237&quot;,&quot;15.00872&quot;,&quot;15.00909&quot;,&quot;16.00292&quot;,&quot;15.00755&quot;,&quot;16.00094&quot;,&quot;14.00613&quot;,&quot;16.00770&quot;,&quot;16.00356&quot;,&quot;16.00498&quot;,&quot;12.00051&quot;,&quot;16.00278&quot;,&quot;15.00276&quot;,&quot;15.00633&quot;,&quot;15.00650&quot;,&quot;15.00766&quot;,&quot;13.00149&quot;,&quot;15.00807&quot;,&quot;16.00220&quot;,&quot;13.00195&quot;,&quot;16.00271&quot;,&quot;15.00883&quot;,&quot;16.00867&quot;,&quot;16.01216&quot;,&quot;16.00465&quot;,&quot;15.00701&quot;,&quot;15.00043&quot;,&quot;14.00041&quot;,&quot;14.00559&quot;,&quot;13.00552&quot;,&quot;16.01185&quot;)
+
+sample_annotation$Ibrutinib_sensitive &lt;- c(NA)
+
+sample_annotation$Ibrutinib_sensitive[rownames(sample_annotation) %in% Ibrutinib_sensitive] &lt;- 1
+sample_annotation$Ibrutinib_sensitive[is.na(sample_annotation$Ibrutinib_sensitive)] &lt;- 0
+
+sample_annotation[, -1] &lt;- lapply(sample_annotation[, -1], as.factor)</code></pre>
+</div>
+</div>
+<div id="save-pre-processed-dataset" class="section level1">
+<h1>Save pre-processed dataset</h1>
+<pre class="r"><code>ProcessTargetResults_BeatAML &lt;- ProcessTargetResults
+tarMat_BeatAML &lt;- ProcessTargetResults$resTarMat
+viabMat_BeatAML &lt;- BeatAML_mat_forest.scale[rownames(tarMat_BeatAML),]
+annotation_beatAML &lt;- sample_annotation
+save(tarMat_BeatAML, viabMat_BeatAML, annotation_beatAML, ProcessTargetResults_BeatAML, file = &quot;../output/inputs_BeatAML.RData&quot;)</code></pre>
+<br>
+<p>
+<button type="button" class="btn btn-default btn-workflowr btn-workflowr-sessioninfo" data-toggle="collapse" data-target="#workflowr-sessioninfo" style="display: block;">
+<span class="glyphicon glyphicon-wrench" aria-hidden="true"></span> Session information
+</button>
+</p>
+<div id="workflowr-sessioninfo" class="collapse">
+<pre class="r"><code>sessionInfo()</code></pre>
+<pre><code>R version 4.0.2 (2020-06-22)
+Platform: x86_64-apple-darwin17.0 (64-bit)
+Running under: macOS  10.16
+
+Matrix products: default
+BLAS:   /Library/Frameworks/R.framework/Versions/4.0/Resources/lib/libRblas.dylib
+LAPACK: /Library/Frameworks/R.framework/Versions/4.0/Resources/lib/libRlapack.dylib
+
+locale:
+[1] en_US.UTF-8/en_US.UTF-8/en_US.UTF-8/C/en_US.UTF-8/en_US.UTF-8
+
+attached base packages:
+[1] parallel  stats4    stats     graphics  grDevices utils     datasets 
+[8] methods   base     
+
+other attached packages:
+ [1] forcats_0.5.1               stringr_1.4.0              
+ [3] dplyr_1.0.7                 purrr_0.3.4                
+ [5] readr_2.0.0                 tidyr_1.1.3                
+ [7] tibble_3.1.3                ggplot2_3.3.5              
+ [9] tidyverse_1.3.1             DESeq2_1.28.1              
+[11] SummarizedExperiment_1.18.2 DelayedArray_0.14.1        
+[13] matrixStats_0.60.0          Biobase_2.48.0             
+[15] GenomicRanges_1.40.0        GenomeInfoDb_1.24.2        
+[17] IRanges_2.22.2              S4Vectors_0.26.1           
+[19] BiocGenerics_0.34.0         missForest_1.4             
+[21] itertools_0.1-3             iterators_1.0.13           
+[23] foreach_1.5.1               randomForest_4.6-14        
+[25] depInfeR_0.1.0             
+
+loaded via a namespace (and not attached):
+  [1] readxl_1.3.1           backports_1.2.1        Hmisc_4.5-0           
+  [4] workflowr_1.6.2        igraph_1.2.6           plyr_1.8.6            
+  [7] splines_4.0.2          BiocParallel_1.22.0    digest_0.6.27         
+ [10] htmltools_0.5.1.1      fansi_0.5.0            magrittr_2.0.1        
+ [13] checkmate_2.0.0        memoise_2.0.0          cluster_2.1.2         
+ [16] doParallel_1.0.16      tzdb_0.1.2             annotate_1.66.0       
+ [19] modelr_0.1.8           vroom_1.5.3            jpeg_0.1-9            
+ [22] colorspace_2.0-2       blob_1.2.2             rvest_1.0.1           
+ [25] haven_2.4.1            xfun_0.24              crayon_1.4.1          
+ [28] RCurl_1.98-1.3         jsonlite_1.7.2         genefilter_1.70.0     
+ [31] survival_3.2-11        glue_1.4.2             gtable_0.3.0          
+ [34] zlibbioc_1.34.0        XVector_0.28.0         shape_1.4.6           
+ [37] abind_1.4-5            scales_1.1.1           DBI_1.1.1             
+ [40] Rcpp_1.0.7             xtable_1.8-4           htmlTable_2.2.1       
+ [43] tmvnsim_1.0-2          foreign_0.8-81         bit_4.0.4             
+ [46] Formula_1.2-4          glmnet_4.1-2           htmlwidgets_1.5.3     
+ [49] httr_1.4.2             lavaan_0.6-9           RColorBrewer_1.1-2    
+ [52] ellipsis_0.3.2         pkgconfig_2.0.3        XML_3.99-0.6          
+ [55] farver_2.1.0           nnet_7.3-16            sass_0.4.0            
+ [58] dbplyr_2.1.1           locfit_1.5-9.4         utf8_1.2.2            
+ [61] reshape2_1.4.4         tidyselect_1.1.1       labeling_0.4.2        
+ [64] rlang_0.4.11           later_1.2.0            AnnotationDbi_1.50.3  
+ [67] munsell_0.5.0          cellranger_1.1.0       tools_4.0.2           
+ [70] cachem_1.0.5           cli_3.0.1              generics_0.1.0        
+ [73] RSQLite_2.2.7          broom_0.7.9            fdrtool_1.2.16        
+ [76] evaluate_0.14          fastmap_1.1.0          yaml_2.2.1            
+ [79] knitr_1.33             bit64_4.0.5            fs_1.5.0              
+ [82] glasso_1.11            pbapply_1.4-3          nlme_3.1-152          
+ [85] xml2_1.3.2             compiler_4.0.2         rstudioapi_0.13       
+ [88] png_0.1-7              reprex_2.0.0           geneplotter_1.66.0    
+ [91] pbivnorm_0.6.0         bslib_0.2.5.1          stringi_1.7.3         
+ [94] highr_0.9              qgraph_1.6.9           lattice_0.20-44       
+ [97] Matrix_1.3-4           psych_2.1.6            ggsci_2.9             
+[100] vctrs_0.3.8            pillar_1.6.2           lifecycle_1.0.0       
+[103] jquerylib_0.1.4        data.table_1.14.0      bitops_1.0-7          
+[106] corpcor_1.6.9          httpuv_1.6.1           R6_2.5.0              
+[109] latticeExtra_0.6-29    promises_1.2.0.1       gridExtra_2.3         
+[112] codetools_0.2-18       gtools_3.9.2           assertthat_0.2.1      
+[115] rprojroot_2.0.2        withr_2.4.2            mnormt_2.0.2          
+[118] GenomeInfoDbData_1.2.3 rlist_0.4.6.1          hms_1.1.0             
+[121] grid_4.0.2             rpart_4.1-15           rmarkdown_2.9         
+[124] git2r_0.28.0           lubridate_1.7.10       base64enc_0.1-3       </code></pre>
+</div>
+</div>
+
+
+<!-- Adjust MathJax settings so that all math formulae are shown using
+TeX fonts only; see
+http://docs.mathjax.org/en/latest/configuration.html.  This will make
+the presentation more consistent at the cost of the webpage sometimes
+taking slightly longer to load. Note that this only works because the
+footer is added to webpages before the MathJax javascript. -->
+<script type="text/x-mathjax-config">
+  MathJax.Hub.Config({
+    "HTML-CSS": { availableFonts: ["TeX"] }
+  });
+</script>
+
+
+
+
+</div>
+</div>
+
+</div>
+
+<script>
+
+// add bootstrap table styles to pandoc tables
+function bootstrapStylePandocTables() {
+  $('tr.odd').parent('tbody').parent('table').addClass('table table-condensed');
+}
+$(document).ready(function () {
+  bootstrapStylePandocTables();
+});
+
+
+</script>
+
+<!-- tabsets -->
+
+<script>
+$(document).ready(function () {
+  window.buildTabsets("TOC");
+});
+
+$(document).ready(function () {
+  $('.tabset-dropdown > .nav-tabs > li').click(function () {
+    $(this).parent().toggleClass('nav-tabs-open');
+  });
+});
+</script>
+
+<!-- code folding -->
+
+<script>
+$(document).ready(function ()  {
+
+    // temporarily add toc-ignore selector to headers for the consistency with Pandoc
+    $('.unlisted.unnumbered').addClass('toc-ignore')
+
+    // move toc-ignore selectors from section div to header
+    $('div.section.toc-ignore')
+        .removeClass('toc-ignore')
+        .children('h1,h2,h3,h4,h5').addClass('toc-ignore');
+
+    // establish options
+    var options = {
+      selectors: "h1,h2,h3",
+      theme: "bootstrap3",
+      context: '.toc-content',
+      hashGenerator: function (text) {
+        return text.replace(/[.\\/?&!#<>]/g, '').replace(/\s/g, '_');
+      },
+      ignoreSelector: ".toc-ignore",
+      scrollTo: 0
+    };
+    options.showAndHide = true;
+    options.smoothScroll = true;
+
+    // tocify
+    var toc = $("#TOC").tocify(options).data("toc-tocify");
+});
+</script>
+
+<!-- dynamically load mathjax for compatibility with self-contained -->
+<script>
+  (function () {
+    var script = document.createElement("script");
+    script.type = "text/javascript";
+    script.src  = "https://mathjax.rstudio.com/latest/MathJax.js?config=TeX-AMS-MML_HTMLorMML";
+    document.getElementsByTagName("head")[0].appendChild(script);
+  })();
+</script>
+
+</body>
+</html>

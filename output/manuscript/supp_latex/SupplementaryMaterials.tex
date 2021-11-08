@@ -1,0 +1,102 @@
+\documentclass{scrartcl}
+\usepackage{graphicx}
+\usepackage{xr}
+\usepackage{url}
+\usepackage[utf8]{inputenc}
+\usepackage[version=4]{mhchem}
+\usepackage{textcomp}
+\usepackage{longtable}
+\usepackage{caption} 
+\usepackage{pagecolor}
+\usepackage[a4paper, left=2cm,right=2cm,top=2.5cm,bottom=2.5cm]{geometry}
+\usepackage[section]{placeins}
+\usepackage{makecell}
+\captionsetup[table]{skip=10pt}
+
+\renewcommand*{\thefigure}{S\arabic{figure}}
+\renewcommand*{\thetable}{S\arabic{table}}
+\externaldocument{main}
+\setkomafont{disposition}{\normalfont\bfseries}
+\pagecolor{white}
+
+\date{}
+\title{Inferring patient-specific cancer dependencies through integrating ex-vivo drug response assays and drug-protein profiling}
+\subtitle{(Supplementary Materials)}
+
+\graphicspath{{figs/}}
+
+
+\begin{document}
+
+\maketitle
+%\tableofcontents
+%\newpage
+
+\section{Supplementary Figures}
+
+\begin{figure}[h]
+    \centering
+    \includegraphics[width=8cm]{supp_arcTrans-1}
+    \caption{Plot of the function, $f(x) = \frac{arctan((x + 2) * 3) + \frac{\pi}{2}}{\pi}$, that is used to transform the $-\log_{10}(Kd)$ values from Kinobeads assays.}
+\end{figure}
+
+\clearpage
+
+\begin{figure}[h]
+    \centering
+    \includegraphics[width=10cm]{targetGroup_supp}
+    \caption{Network plots showing the clusters of kinases that have similar drug binding profiles (cosine similarity $>$ 0.8). For each drug screen dataset, only the kinases that were selected by our protein dependence inference algorithm and share similar drug binding profiles with other kinases are shown here.}
+\end{figure}
+
+\begin{figure}[h]
+    \centering
+    \includegraphics[width=16cm]{drugTargetNet_EMBL-1}
+    \caption{A network plot showing the drug-kinase binding landscape measured by the Kinobeads assay. Only the high confidence drug-kinase pairs are included. Drugs are shown as blue circles and kinases are shown as red squares. No clear structure can be observed directly from the drug-kinase network.}
+\end{figure}
+
+
+\begin{figure}[h]
+    \centering
+    \includegraphics[width=15cm]{GDSC_coefHeatmap-1}
+    \caption{Heatmap visualization of the protein dependence values for selected kinases, inferred from the GDSC drug screen dataset. Red indicates high dependence value and blue indicates low dependence value. In the column annotations, cell lines with certain genomic variations are colored by black. Columns are ordered by hierarchical clustering based on euclidean distance.} 
+    
+\end{figure}
+
+
+\begin{figure}[h]
+    \centering
+    \includegraphics[width=15cm]{beatAML_geneAssociations-1}
+    \caption{Boxplots showing the significant associations between the genomic variations and the protein dependence values inferred from the beatAML drug screen dataset.}
+    
+\end{figure}
+
+\begin{figure}[h]
+    \centering
+    \includegraphics[width=16cm]{EMBL_coefHeatmap-1}
+    \caption{Heatmap visualization of the protein dependence values for selected the kinases inferred from the EMBL2016 drug screen dataset. Red indicates high dependence value and blue indicates low dependence values. The column annotations of the heatmap indicate the disease types, genomic variations and epigenetic subtypes of the primary blood cancer samples. Columns are ordered by hierarchical clustering based on euclidean distance.}
+\end{figure}
+
+\begin{figure}[h]
+    \centering
+    \includegraphics[width=10cm]{supp_BTKvsDiag-1}
+    \caption{Association between the inferred dependence on BTK and the disease types, based on the EMBL2016 drug screen dataset.}
+\end{figure}
+
+\begin{figure}[h]
+    \centering
+    \includegraphics[width=15cm]{RNAseq_ICGC-1}
+    \caption{Enrichment analysis for genes differentially expressed between IGHV mutated and unmutated CLL samples in the ICGC-CLL cohort (EGA accession ID: EGAS00001000374). "Up" (colored by red") indicates the gene sets enriched for the genes up-regulated in U-CLL samples compared to M-CLL samples. The enrichment analysis was perform by using CAMERA against the Cancer Hallmark gene sets from the Molecular Signature Database (MSigDB). Only the gene sets passed 5\% FDR are shown. The gene sets that have been shown to be related to CHEK1 functions are colored in red.}
+\end{figure}
+
+
+\begin{figure}[h]
+    \centering
+    \includegraphics[width=15cm]{CHK_expr-1}
+    \caption{Differential expression of three downstream genes regulated by CHEK1 pathway in IGHV unmutated and mutated CLL samples from the ICGC-CLL cohort. \textit{P} values  were calculated by DESeq2.}
+\end{figure}
+
+
+\clearpage
+
+\end{document}
+

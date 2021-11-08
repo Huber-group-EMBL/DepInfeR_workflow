@@ -1,0 +1,1820 @@
+<!DOCTYPE html>
+
+<html>
+
+<head>
+
+<meta charset="utf-8" />
+<meta name="generator" content="pandoc" />
+<meta http-equiv="X-UA-Compatible" content="IE=EDGE" />
+
+
+<meta name="author" content="Junyan Lu" />
+
+<meta name="date" content="2021-10-05" />
+
+<title>Pre-processing GDSC drug screen datasets</title>
+
+<script src="site_libs/header-attrs-2.9/header-attrs.js"></script>
+<script src="site_libs/jquery-1.11.3/jquery.min.js"></script>
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<link href="site_libs/bootstrap-3.3.5/css/cosmo.min.css" rel="stylesheet" />
+<script src="site_libs/bootstrap-3.3.5/js/bootstrap.min.js"></script>
+<script src="site_libs/bootstrap-3.3.5/shim/html5shiv.min.js"></script>
+<script src="site_libs/bootstrap-3.3.5/shim/respond.min.js"></script>
+<style>h1 {font-size: 34px;}
+       h1.title {font-size: 38px;}
+       h2 {font-size: 30px;}
+       h3 {font-size: 24px;}
+       h4 {font-size: 18px;}
+       h5 {font-size: 16px;}
+       h6 {font-size: 12px;}
+       code {color: inherit; background-color: rgba(0, 0, 0, 0.04);}
+       pre:not([class]) { background-color: white }</style>
+<script src="site_libs/jqueryui-1.11.4/jquery-ui.min.js"></script>
+<link href="site_libs/tocify-1.9.1/jquery.tocify.css" rel="stylesheet" />
+<script src="site_libs/tocify-1.9.1/jquery.tocify.js"></script>
+<script src="site_libs/navigation-1.1/tabsets.js"></script>
+<link href="site_libs/highlightjs-9.12.0/textmate.css" rel="stylesheet" />
+<script src="site_libs/highlightjs-9.12.0/highlight.js"></script>
+
+<link rel="icon" href="https://github.com/workflowr/workflowr-assets/raw/master/img/reproducible.png">
+<!-- Add a small amount of space between sections. -->
+<style type="text/css">
+div.section {
+  padding-top: 12px;
+}
+</style>
+
+
+
+<style type="text/css">
+  code{white-space: pre-wrap;}
+  span.smallcaps{font-variant: small-caps;}
+  span.underline{text-decoration: underline;}
+  div.column{display: inline-block; vertical-align: top; width: 50%;}
+  div.hanging-indent{margin-left: 1.5em; text-indent: -1.5em;}
+  ul.task-list{list-style: none;}
+    </style>
+
+<style type="text/css">code{white-space: pre;}</style>
+<script type="text/javascript">
+if (window.hljs) {
+  hljs.configure({languages: []});
+  hljs.initHighlightingOnLoad();
+  if (document.readyState && document.readyState === "complete") {
+    window.setTimeout(function() { hljs.initHighlighting(); }, 0);
+  }
+}
+</script>
+
+
+
+
+
+
+
+
+<style type = "text/css">
+.main-container {
+  max-width: 940px;
+  margin-left: auto;
+  margin-right: auto;
+}
+img {
+  max-width:100%;
+}
+.tabbed-pane {
+  padding-top: 12px;
+}
+.html-widget {
+  margin-bottom: 20px;
+}
+button.code-folding-btn:focus {
+  outline: none;
+}
+summary {
+  display: list-item;
+}
+pre code {
+  padding: 0;
+}
+</style>
+
+
+<style type="text/css">
+.dropdown-submenu {
+  position: relative;
+}
+.dropdown-submenu>.dropdown-menu {
+  top: 0;
+  left: 100%;
+  margin-top: -6px;
+  margin-left: -1px;
+  border-radius: 0 6px 6px 6px;
+}
+.dropdown-submenu:hover>.dropdown-menu {
+  display: block;
+}
+.dropdown-submenu>a:after {
+  display: block;
+  content: " ";
+  float: right;
+  width: 0;
+  height: 0;
+  border-color: transparent;
+  border-style: solid;
+  border-width: 5px 0 5px 5px;
+  border-left-color: #cccccc;
+  margin-top: 5px;
+  margin-right: -10px;
+}
+.dropdown-submenu:hover>a:after {
+  border-left-color: #adb5bd;
+}
+.dropdown-submenu.pull-left {
+  float: none;
+}
+.dropdown-submenu.pull-left>.dropdown-menu {
+  left: -100%;
+  margin-left: 10px;
+  border-radius: 6px 0 6px 6px;
+}
+</style>
+
+<script type="text/javascript">
+// manage active state of menu based on current page
+$(document).ready(function () {
+  // active menu anchor
+  href = window.location.pathname
+  href = href.substr(href.lastIndexOf('/') + 1)
+  if (href === "")
+    href = "index.html";
+  var menuAnchor = $('a[href="' + href + '"]');
+
+  // mark it active
+  menuAnchor.tab('show');
+
+  // if it's got a parent navbar menu mark it active as well
+  menuAnchor.closest('li.dropdown').addClass('active');
+
+  // Navbar adjustments
+  var navHeight = $(".navbar").first().height() + 15;
+  var style = document.createElement('style');
+  var pt = "padding-top: " + navHeight + "px; ";
+  var mt = "margin-top: -" + navHeight + "px; ";
+  var css = "";
+  // offset scroll position for anchor links (for fixed navbar)
+  for (var i = 1; i <= 6; i++) {
+    css += ".section h" + i + "{ " + pt + mt + "}\n";
+  }
+  style.innerHTML = "body {" + pt + "padding-bottom: 40px; }\n" + css;
+  document.head.appendChild(style);
+});
+</script>
+
+<!-- tabsets -->
+
+<style type="text/css">
+.tabset-dropdown > .nav-tabs {
+  display: inline-table;
+  max-height: 500px;
+  min-height: 44px;
+  overflow-y: auto;
+  border: 1px solid #ddd;
+  border-radius: 4px;
+}
+
+.tabset-dropdown > .nav-tabs > li.active:before {
+  content: "";
+  font-family: 'Glyphicons Halflings';
+  display: inline-block;
+  padding: 10px;
+  border-right: 1px solid #ddd;
+}
+
+.tabset-dropdown > .nav-tabs.nav-tabs-open > li.active:before {
+  content: "&#xe258;";
+  border: none;
+}
+
+.tabset-dropdown > .nav-tabs.nav-tabs-open:before {
+  content: "";
+  font-family: 'Glyphicons Halflings';
+  display: inline-block;
+  padding: 10px;
+  border-right: 1px solid #ddd;
+}
+
+.tabset-dropdown > .nav-tabs > li.active {
+  display: block;
+}
+
+.tabset-dropdown > .nav-tabs > li > a,
+.tabset-dropdown > .nav-tabs > li > a:focus,
+.tabset-dropdown > .nav-tabs > li > a:hover {
+  border: none;
+  display: inline-block;
+  border-radius: 4px;
+  background-color: transparent;
+}
+
+.tabset-dropdown > .nav-tabs.nav-tabs-open > li {
+  display: block;
+  float: none;
+}
+
+.tabset-dropdown > .nav-tabs > li {
+  display: none;
+}
+</style>
+
+<!-- code folding -->
+
+
+
+<style type="text/css">
+
+#TOC {
+  margin: 25px 0px 20px 0px;
+}
+@media (max-width: 768px) {
+#TOC {
+  position: relative;
+  width: 100%;
+}
+}
+
+@media print {
+.toc-content {
+  /* see https://github.com/w3c/csswg-drafts/issues/4434 */
+  float: right;
+}
+}
+
+.toc-content {
+  padding-left: 30px;
+  padding-right: 40px;
+}
+
+div.main-container {
+  max-width: 1200px;
+}
+
+div.tocify {
+  width: 20%;
+  max-width: 260px;
+  max-height: 85%;
+}
+
+@media (min-width: 768px) and (max-width: 991px) {
+  div.tocify {
+    width: 25%;
+  }
+}
+
+@media (max-width: 767px) {
+  div.tocify {
+    width: 100%;
+    max-width: none;
+  }
+}
+
+.tocify ul, .tocify li {
+  line-height: 20px;
+}
+
+.tocify-subheader .tocify-item {
+  font-size: 0.90em;
+}
+
+.tocify .list-group-item {
+  border-radius: 0px;
+}
+
+
+</style>
+
+
+
+</head>
+
+<body>
+
+
+<div class="container-fluid main-container">
+
+
+<!-- setup 3col/9col grid for toc_float and main content  -->
+<div class="row">
+<div class="col-xs-12 col-sm-4 col-md-3">
+<div id="TOC" class="tocify">
+</div>
+</div>
+
+<div class="toc-content col-xs-12 col-sm-8 col-md-9">
+
+
+
+
+<div class="navbar navbar-default  navbar-fixed-top" role="navigation">
+  <div class="container">
+    <div class="navbar-header">
+      <button type="button" class="navbar-toggle collapsed" data-toggle="collapse" data-target="#navbar">
+        <span class="icon-bar"></span>
+        <span class="icon-bar"></span>
+        <span class="icon-bar"></span>
+      </button>
+      <a class="navbar-brand" href="index.html">DepInfeR</a>
+    </div>
+    <div id="navbar" class="navbar-collapse collapse">
+      <ul class="nav navbar-nav">
+        <li>
+  <a href="index.html">Home</a>
+</li>
+      </ul>
+      <ul class="nav navbar-nav navbar-right">
+        
+      </ul>
+    </div><!--/.nav-collapse -->
+  </div><!--/.container -->
+</div><!--/.navbar -->
+
+<div id="header">
+
+
+
+<h1 class="title toc-ignore">Pre-processing GDSC drug screen datasets</h1>
+<h4 class="author">Junyan Lu</h4>
+<h4 class="date">2021-10-05</h4>
+
+</div>
+
+
+<p>
+<button type="button" class="btn btn-default btn-workflowr btn-workflowr-report" data-toggle="collapse" data-target="#workflowr-report">
+<span class="glyphicon glyphicon-list" aria-hidden="true"></span> workflowr <span class="glyphicon glyphicon-exclamation-sign text-danger" aria-hidden="true"></span>
+</button>
+</p>
+<div id="workflowr-report" class="collapse">
+<ul class="nav nav-tabs">
+<li class="active">
+<a data-toggle="tab" href="#summary">Summary</a>
+</li>
+<li>
+<a data-toggle="tab" href="#checks"> Checks <span class="glyphicon glyphicon-exclamation-sign text-danger" aria-hidden="true"></span> </a>
+</li>
+<li>
+<a data-toggle="tab" href="#versions">Past versions</a>
+</li>
+</ul>
+<div class="tab-content">
+<div id="summary" class="tab-pane fade in active">
+<p>
+<strong>Last updated:</strong> 2021-11-04
+</p>
+<p>
+<strong>Checks:</strong> <span class="glyphicon glyphicon-ok text-success" aria-hidden="true"></span> 6 <span class="glyphicon glyphicon-exclamation-sign text-danger" aria-hidden="true"></span> 1
+</p>
+<p>
+<strong>Knit directory:</strong> <code>DepInfeR/analysis/</code> <span class="glyphicon glyphicon-question-sign" aria-hidden="true" title="This is the local directory in which the code in this file was executed."> </span>
+</p>
+<p>
+This reproducible <a href="http://rmarkdown.rstudio.com">R Markdown</a> analysis was created with <a
+  href="https://github.com/jdblischak/workflowr">workflowr</a> (version 1.6.2). The <em>Checks</em> tab describes the reproducibility checks that were applied when the results were created. The <em>Past versions</em> tab lists the development history.
+</p>
+<hr>
+</div>
+<div id="checks" class="tab-pane fade">
+<div id="workflowr-checks" class="panel-group">
+<div class="panel panel-default">
+<div class="panel-heading">
+<p class="panel-title">
+<a data-toggle="collapse" data-parent="#workflowr-checks" href="#strongRMarkdownfilestronguncommittedchanges"> <span class="glyphicon glyphicon-exclamation-sign text-danger" aria-hidden="true"></span> <strong>R Markdown file:</strong> uncommitted changes </a>
+</p>
+</div>
+<div id="strongRMarkdownfilestronguncommittedchanges" class="panel-collapse collapse">
+<div class="panel-body">
+<p>The R Markdown is untracked by Git. To know which version of the R Markdown file created these results, you’ll want to first commit it to the Git repo. If you’re still working on the analysis, you can ignore this warning. When you’re finished, you can run <code>wflow_publish</code> to commit the R Markdown file and build the HTML.</p>
+</div>
+</div>
+</div>
+<div class="panel panel-default">
+<div class="panel-heading">
+<p class="panel-title">
+<a data-toggle="collapse" data-parent="#workflowr-checks" href="#strongEnvironmentstrongempty"> <span class="glyphicon glyphicon-ok text-success" aria-hidden="true"></span> <strong>Environment:</strong> empty </a>
+</p>
+</div>
+<div id="strongEnvironmentstrongempty" class="panel-collapse collapse">
+<div class="panel-body">
+<p>Great job! The global environment was empty. Objects defined in the global environment can affect the analysis in your R Markdown file in unknown ways. For reproduciblity it’s best to always run the code in an empty environment.</p>
+</div>
+</div>
+</div>
+<div class="panel panel-default">
+<div class="panel-heading">
+<p class="panel-title">
+<a data-toggle="collapse" data-parent="#workflowr-checks" href="#strongSeedstrongcodesetseed20211005code"> <span class="glyphicon glyphicon-ok text-success" aria-hidden="true"></span> <strong>Seed:</strong> <code>set.seed(20211005)</code> </a>
+</p>
+</div>
+<div id="strongSeedstrongcodesetseed20211005code" class="panel-collapse collapse">
+<div class="panel-body">
+<p>The command <code>set.seed(20211005)</code> was run prior to running the code in the R Markdown file. Setting a seed ensures that any results that rely on randomness, e.g. subsampling or permutations, are reproducible.</p>
+</div>
+</div>
+</div>
+<div class="panel panel-default">
+<div class="panel-heading">
+<p class="panel-title">
+<a data-toggle="collapse" data-parent="#workflowr-checks" href="#strongSessioninformationstrongrecorded"> <span class="glyphicon glyphicon-ok text-success" aria-hidden="true"></span> <strong>Session information:</strong> recorded </a>
+</p>
+</div>
+<div id="strongSessioninformationstrongrecorded" class="panel-collapse collapse">
+<div class="panel-body">
+<p>Great job! Recording the operating system, R version, and package versions is critical for reproducibility.</p>
+</div>
+</div>
+</div>
+<div class="panel panel-default">
+<div class="panel-heading">
+<p class="panel-title">
+<a data-toggle="collapse" data-parent="#workflowr-checks" href="#strongCachestrongnone"> <span class="glyphicon glyphicon-ok text-success" aria-hidden="true"></span> <strong>Cache:</strong> none </a>
+</p>
+</div>
+<div id="strongCachestrongnone" class="panel-collapse collapse">
+<div class="panel-body">
+<p>Nice! There were no cached chunks for this analysis, so you can be confident that you successfully produced the results during this run.</p>
+</div>
+</div>
+</div>
+<div class="panel panel-default">
+<div class="panel-heading">
+<p class="panel-title">
+<a data-toggle="collapse" data-parent="#workflowr-checks" href="#strongFilepathsstrongrelative"> <span class="glyphicon glyphicon-ok text-success" aria-hidden="true"></span> <strong>File paths:</strong> relative </a>
+</p>
+</div>
+<div id="strongFilepathsstrongrelative" class="panel-collapse collapse">
+<div class="panel-body">
+<p>Great job! Using relative paths to the files within your workflowr project makes it easier to run your code on other machines.</p>
+</div>
+</div>
+</div>
+<div class="panel panel-default">
+<div class="panel-heading">
+<p class="panel-title">
+<a data-toggle="collapse" data-parent="#workflowr-checks" href="#strongRepositoryversionstrong43be8a7"> <span class="glyphicon glyphicon-ok text-success" aria-hidden="true"></span> <strong>Repository version:</strong> 43be8a7 </a>
+</p>
+</div>
+<div id="strongRepositoryversionstrong43be8a7" class="panel-collapse collapse">
+<div class="panel-body">
+<p>
+Great! You are using Git for version control. Tracking code development and connecting the code version to the results is critical for reproducibility.
+</p>
+<p>
+The results in this page were generated with repository version 43be8a7. See the <em>Past versions</em> tab to see a history of the changes made to the R Markdown and HTML files.
+</p>
+<p>
+Note that you need to be careful to ensure that all relevant files for the analysis have been committed to Git prior to generating the results (you can use <code>wflow_publish</code> or <code>wflow_git_commit</code>). workflowr only checks the R Markdown file, but you know if there are other scripts or data files that it depends on. Below is the status of the Git repository when the results were generated:
+</p>
+<pre><code>
+Ignored files:
+    Ignored:    .DS_Store
+    Ignored:    .Rhistory
+    Ignored:    .Rproj.user/
+    Ignored:    analysis/.DS_Store
+    Ignored:    analysis/.Rhistory
+    Ignored:    data/.DS_Store
+    Ignored:    output/.DS_Store
+
+Untracked files:
+    Untracked:  analysis/analysis_EMBL2016.Rmd
+    Untracked:  analysis/analysis_GDSC.Rmd
+    Untracked:  analysis/analysis_RNAseq.Rmd
+    Untracked:  analysis/analysis_beatAML.Rmd
+    Untracked:  analysis/process_EMBL2016.Rmd
+    Untracked:  analysis/process_GDSC.Rmd
+    Untracked:  analysis/process_beatAML.Rmd
+    Untracked:  analysis/process_kinobeads.Rmd
+    Untracked:  code/utils.R
+    Untracked:  data/BeatAML/
+    Untracked:  data/EMBL2016/
+    Untracked:  data/GDSC/
+    Untracked:  data/Kinobeads/
+    Untracked:  data/RNAseq/
+    Untracked:  manuscript/
+    Untracked:  output/BeatAML_result.RData
+    Untracked:  output/EMBL_result.RData
+    Untracked:  output/EMBL_resultSub.RData
+    Untracked:  output/GDSC_result.RData
+    Untracked:  output/allTargets.rds
+    Untracked:  output/inputs_BeatAML.RData
+    Untracked:  output/inputs_EMBL.RData
+    Untracked:  output/inputs_GDSC.RData
+
+Unstaged changes:
+    Modified:   README.md
+    Modified:   _workflowr.yml
+    Modified:   analysis/_site.yml
+    Deleted:    analysis/about.Rmd
+    Modified:   analysis/index.Rmd
+    Deleted:    analysis/license.Rmd
+    Deleted:    output/README.md
+
+</code></pre>
+<p>
+Note that any generated files, e.g. HTML, png, CSS, etc., are not included in this status report because it is ok for generated content to have uncommitted changes.
+</p>
+</div>
+</div>
+</div>
+</div>
+<hr>
+</div>
+<div id="versions" class="tab-pane fade">
+<p>
+There are no past versions. Publish this analysis with <code>wflow_publish()</code> to start tracking its development.
+</p>
+<hr>
+</div>
+</div>
+</div>
+<div id="load-packages" class="section level1">
+<h1>Load packages</h1>
+<p>Packages</p>
+<pre class="r"><code>library(depInfeR)
+library(RColorBrewer)
+library(pheatmap)
+library(ggbeeswarm)
+library(ggrepel)
+library(fpc)
+library(igraph)
+library(factoextra)
+library(tidyverse)
+source(&quot;../code/utils.R&quot;)
+knitr::opts_chunk$set(dev=c(&quot;png&quot;,&quot;pdf&quot;))</code></pre>
+</div>
+<div id="load-pre-processed-datasets" class="section level1">
+<h1>Load pre-processed datasets</h1>
+<pre class="r"><code>load(&quot;../output/inputs_EMBL.RData&quot;)</code></pre>
+<div id="dimensions-of-input-matrices" class="section level2">
+<h2>Dimensions of input matrices</h2>
+<p>Drug-target</p>
+<pre class="r"><code>dim(tarMat_EMBL)</code></pre>
+<pre><code>[1]  85 136</code></pre>
+<p>Drug-sample (viability matrix)</p>
+<pre class="r"><code>dim(viabMat_EMBL)</code></pre>
+<pre><code>[1]  85 131</code></pre>
+</div>
+</div>
+<div id="multivariant-model-for-protein-dependence-prediction" class="section level1">
+<h1>Multivariant model for protein dependence prediction</h1>
+<p>Perform multivariant LASSO regression based on a drug-protein affinity matrix and a drug response matrix.<br />
+This chunk can take a long time to run. Therefore we will save the result for later use to save time.</p>
+<pre class="r"><code>#column wise scale of the viability matrix, to keep the drug effect rank
+viabMat.scale &lt;- t(mscale(t(viabMat_EMBL)))
+
+#run lasso regression
+result &lt;- runLASSOregression(TargetMatrix = tarMat_EMBL , ViabMatrix = viabMat.scale, seed = 333)
+
+#remove targets that were never selected
+useTar &lt;- rowSums(result$coefMat) != 0
+result$coefMat &lt;- result$coefMat[useTar,]
+
+
+#save intermediate results
+save(result, file = &quot;../output/EMBL_result.RData&quot;)</code></pre>
+<p>Load the saved result</p>
+<pre class="r"><code>load(&quot;../output/EMBL_result.RData&quot;)</code></pre>
+<p>Number of selected targets</p>
+<pre class="r"><code>nrow(result$coefMat)</code></pre>
+<pre><code>[1] 24</code></pre>
+</div>
+<div id="make-genomic-patient-annotation" class="section level1">
+<h1>Make genomic patient annotation</h1>
+<p>Prepare column annotations</p>
+<pre class="r"><code>#genetic background annotation
+colAnno &lt;- dplyr::select(annotation_EMBL, Patient.ID, 
+                  diagnosis, IGHV.status, 
+                  Methylation_Cluster,
+                  trisomy12, TP53, del11q) %&gt;% 
+  data.frame() %&gt;% remove_rownames() %&gt;%
+  column_to_rownames(&quot;Patient.ID&quot;)
+
+colAnno_cll &lt;- dplyr::filter(colAnno, diagnosis == &quot;CLL&quot;)
+
+
+#color for annotation
+annoColor &lt;- list(treatment = c(Yes = &quot;black&quot;, No = &quot;grey80&quot;),
+                  IGHV.status = c(M = &quot;black&quot;,U=&quot;grey80&quot;),
+                  Methylation_Cluster = c(HP = &quot;darkblue&quot;, IP = &quot;blue&quot;, LP = &quot;lightblue&quot;),
+                  diagnosis = c(CLL = &quot;#BC3C29FF&quot;, MCL = &quot;#E18727FF&quot;,`T-PLL`=&quot;#20854EFF&quot;))
+for (name in setdiff(colnames(colAnno),names(annoColor))) {
+  annoColor[[name]] &lt;- c(`1` = &quot;black&quot;,`0` = &quot;grey80&quot;) 
+}</code></pre>
+</div>
+<div id="heatmap-plot-of-protein-dependence-matrix" class="section level1">
+<h1>Heatmap plot of protein dependence matrix</h1>
+<pre class="r"><code>plotTab &lt;- result$coefMat
+
+#normalization for different protein dependencies (over samples) without changing the coefficient sign
+plotTab_scaled &lt;- scale(t(plotTab), center = FALSE, scale = TRUE)
+plotTab &lt;- t(plotTab_scaled)
+
+pheatmap(plotTab, 
+         color=colorRampPalette(rev(brewer.pal(n = 7, name =&quot;RdBu&quot;)), bias= 1.2)(100),
+         annotation_col = colAnno,
+         annotation_colors = annoColor,
+         clustering_method = &quot;ward.D2&quot;, scale = &quot;none&quot;, 
+         show_colnames = TRUE, main = &quot;row scaled&quot;, fontsize = 9, fontsize_row = 10, fontsize_col = 7)</code></pre>
+<p><img src="figure/analysis_EMBL2016.Rmd/EMBL_coefHeatmap-1.png" width="1728" style="display: block; margin: auto;" /></p>
+<div id="btk-importance-among-cll-mcl-and-t-pll" class="section level2">
+<h2>BTK importance among CLL, MCL and T-PLL</h2>
+<pre class="r"><code>coefMatAll &lt;- result$coefMat
+plotTab &lt;- tibble(patID = colnames(coefMatAll),
+                  coef = coefMatAll[&quot;BTK&quot;,]) %&gt;%
+  mutate(diagnosis = colAnno[patID,]$diagnosis) %&gt;%
+  group_by(diagnosis) %&gt;% mutate(n=length(patID)) %&gt;%
+  mutate(diagnosis = sprintf(&quot;%s (n=%s)&quot;, diagnosis, n))
+
+g &lt;- ggplot(na.omit(plotTab), aes(x=diagnosis,y=coef)) + 
+  geom_violin(aes(fill = diagnosis)) + scale_fill_manual(values=c(&quot;#46B8DAFF&quot;,&quot;#D43F3AFF&quot;,&quot;#EEA236FF&quot;)) + geom_beeswarm() +
+  xlab(&quot;&quot;) + ylab(&quot;Protein dependence&quot;) + ggtitle(sprintf(&quot;BTK ~ diagnosis&quot;)) +
+  theme_custom + theme(legend.position = &quot;none&quot;)
+
+
+
+g</code></pre>
+<p><img src="figure/analysis_EMBL2016.Rmd/supp_BTKvsDiag-1.png" width="768" style="display: block; margin: auto;" /></p>
+</div>
+</div>
+<div id="assessment-of-results" class="section level1">
+<h1>Assessment of results</h1>
+<div id="pca" class="section level2">
+<h2>PCA</h2>
+<p>PCA plot of protein dependence matrix of CLL samples colored by IGHV status</p>
+<pre class="r"><code>coefMat_cll &lt;- result$coefMat[,rownames(colAnno_cll)]
+
+res_pca_imp_kd_cll &lt;- prcomp(t(coefMat_cll), scale = T, center = TRUE)
+#fviz_eig(res_pca_imp_kd_cll)
+
+#PCA plot for IGHV mutation status
+fviz_pca_ind(res_pca_imp_kd_cll,
+             geom = c(&quot;point&quot;),
+             pointsize = 2,
+             repel = TRUE,  
+             xlab = &quot;PC1&quot;,
+             ylab = &quot;PC2&quot;, 
+             habillage = colAnno_cll$IGHV.status,
+             title = &quot;Protein dependence - PCA - Lasso kd - CLL&quot;) +
+                  theme(axis.text = element_text(size = 12), 
+                        axis.title = element_text(size = 14),
+                        plot.title = element_text(size = 12, hjust = 0.5, face = &quot;bold&quot;)) + 
+                  scale_color_manual(breaks=c(&quot;M&quot;,&quot;U&quot;), values= c(&quot;#46B8DAFF&quot;,&quot;#D43F3AFF&quot;), name = &quot;IGHV&quot;) +  
+                  scale_shape(guide=FALSE)</code></pre>
+<pre><code>Warning: Removed 2 rows containing missing values (geom_point).</code></pre>
+<pre><code>Warning: Removed 1 rows containing missing values (geom_point).</code></pre>
+<pre><code>Warning: It is deprecated to specify `guide = FALSE` to remove a guide. Please
+use `guide = &quot;none&quot;` instead.</code></pre>
+<p><img src="figure/analysis_EMBL2016.Rmd/unnamed-chunk-5-1.png" width="672" style="display: block; margin: auto;" /></p>
+</div>
+<div id="k-means-clustering" class="section level2">
+<h2>k-means clustering</h2>
+<p>k-means clustering of protein dependence matrix with IGHV status annotation</p>
+<pre class="r"><code>colList_mut &lt;- c(&quot;#BC3C29FF&quot;,&quot;#0072B5FF&quot;)
+kclus_tab &lt;- merge(colAnno_cll[,1:2], t(coefMat_cll), all = T, by = &#39;row.names&#39;)
+kclus_tab &lt;- remove_rownames(kclus_tab) %&gt;% column_to_rownames(&quot;Row.names&quot;)
+kclus_tab &lt;- na.omit(kclus_tab)
+km_res_imp &lt;- eclust(kclus_tab[,-c(1:2)], &quot;kmeans&quot;, k = 2, nstart = 50, graph = FALSE, stand = T)
+
+pcTar &lt;- fviz_cluster(km_res_imp, kclus_tab[,-c(1:2)], geom = c(&quot;point&quot;)) + 
+  geom_point(aes(colour= kclus_tab$IGHV.status)) + 
+  ggtitle(&quot;k-means clustering of \nprotein dependence matrix&quot;) +
+  scale_shape(guide=FALSE) +   
+  scale_color_manual(breaks=c(&quot;M&quot;,&quot;U&quot;), values= c(&quot;#0072B5FF&quot;, &quot;#BC3C29FF&quot;, &quot;#BC3C29FF&quot;,&quot;#0072B5FF&quot;), name = &quot;IGHV&quot;) +
+  scale_fill_manual(values = colList_mut) + xlab(&quot;PC1&quot;) + ylab(&quot;PC2&quot;) +
+  theme_custom + theme(plot.title = element_text(size=20, face=&quot;bold&quot;)) + xlim(-6,6) + ylim(-8,8)
+
+pcTar</code></pre>
+<pre><code>Warning: It is deprecated to specify `guide = FALSE` to remove a guide. Please
+use `guide = &quot;none&quot;` instead.</code></pre>
+<p><img src="figure/analysis_EMBL2016.Rmd/kMeans_coef-1.png" width="672" style="display: block; margin: auto;" /></p>
+<p>k-means clustering of drug response matrix with IGHV status annotation</p>
+<pre class="r"><code>kclus_tab_drug &lt;- merge(colAnno_cll[,1:2], t(viabMat_EMBL), all=T, by=&#39;row.names&#39;)
+kclus_tab_drug &lt;- remove_rownames(kclus_tab_drug) %&gt;% column_to_rownames(&quot;Row.names&quot;)
+kclus_tab_drug &lt;- na.omit(kclus_tab_drug)
+
+km_res_drug &lt;- eclust(kclus_tab_drug[,-c(1:2)], &quot;kmeans&quot;, k = 2, nstart = 50, graph = FALSE, stand = T)
+
+pcDrug &lt;- fviz_cluster(km_res_drug, kclus_tab_drug[,-c(1:2)], geom = c(&quot;point&quot;)) + 
+  geom_point(aes(colour= kclus_tab_drug$IGHV.status)) + 
+  ggtitle(&quot;k-means clustering of \ndrug response matrix&quot;) +
+  scale_shape(guide=FALSE) +   scale_color_manual(breaks=c(&quot;M&quot;,&quot;U&quot;), values= c(&quot;#0072B5FF&quot;, &quot;#BC3C29FF&quot;, &quot;#BC3C29FF&quot;,&quot;#0072B5FF&quot;), name = &quot;IGHV&quot;) +
+  scale_fill_manual(values = colList_mut) + xlab(&quot;PC1&quot;) + ylab(&quot;PC2&quot;) +
+  theme_custom + theme(plot.title = element_text(size=20, face=&quot;bold&quot;)) +
+  scale_x_reverse(breaks = c(12, 6, 0, -6, -12), limits=c(12,-12), labels = c(-12,-6,0,6,12)) +
+  ylim(-12,12)
+pcDrug</code></pre>
+<pre><code>Warning: Removed 4 rows containing non-finite values (stat_chull).</code></pre>
+<pre><code>Warning: Removed 4 rows containing non-finite values (stat_mean).</code></pre>
+<pre><code>Warning: Removed 4 rows containing missing values (geom_point).
+
+Warning: Removed 4 rows containing missing values (geom_point).</code></pre>
+<pre><code>Warning: It is deprecated to specify `guide = FALSE` to remove a guide. Please
+use `guide = &quot;none&quot;` instead.</code></pre>
+<p><img src="figure/analysis_EMBL2016.Rmd/kMeans_drug-1.png" width="672" style="display: block; margin: auto;" /></p>
+</div>
+<div id="external-cluster-assessment-based-on-k-means-results---ighv-status---rand-index" class="section level2">
+<h2>External cluster assessment (based on k-means results) - IGHV status - Rand Index</h2>
+<p>An external cluster analysis evaluates the clustering quality by comparing the found cluster belonging to the known ground-truth. The Rand Index is a good measure to evaluate how many datapoints were clustered correctly when comparing the found clusters to the known ground truth. The Rand Index ranges between 0 and 1 and a higher index corresponds to more datapoints being clustered in their correct groups.</p>
+<pre class="r"><code># function to calculate cross tabulation between k-means clusters and ground truth
+externalClust &lt;- function(clusterTab, kmeansResult, header) {
+  #calculation
+  crossTab &lt;- table(clusterTab$IGHV.status, kmeansResult$cluster)
+  status &lt;- as.numeric(factor(clusterTab$IGHV.status))
+  imp_stats &lt;- cluster.stats(d = dist(clusterTab[,-c(1:2)]), 
+                             status, kmeansResult$cluster)
+  randScore &lt;- round(imp_stats$corrected.rand, 3)
+  #create table
+  crossTab &lt;- data.frame(IGHV = rownames(crossTab), Cluster1 = c(crossTab[,1]), Cluster2 = c(crossTab[,2])) %&gt;% 
+    gt::gt(rowname_col = &quot;rowname&quot;) %&gt;%  
+    gt::tab_header(title = header, subtitle = paste(&quot;Rand Index is&quot;, randScore)) 
+  return(crossTab)
+}
+
+
+# target importance
+externalClust(kclus_tab, km_res_imp , header = &quot;Cross tabulation protein dependence&quot;)</code></pre>
+<div id="yncngcwvzo" style="overflow-x:auto;overflow-y:auto;width:auto;height:auto;">
+<style>html {
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, 'Helvetica Neue', 'Fira Sans', 'Droid Sans', Arial, sans-serif;
+}
+
+#yncngcwvzo .gt_table {
+  display: table;
+  border-collapse: collapse;
+  margin-left: auto;
+  margin-right: auto;
+  color: #333333;
+  font-size: 16px;
+  font-weight: normal;
+  font-style: normal;
+  background-color: #FFFFFF;
+  width: auto;
+  border-top-style: solid;
+  border-top-width: 2px;
+  border-top-color: #A8A8A8;
+  border-right-style: none;
+  border-right-width: 2px;
+  border-right-color: #D3D3D3;
+  border-bottom-style: solid;
+  border-bottom-width: 2px;
+  border-bottom-color: #A8A8A8;
+  border-left-style: none;
+  border-left-width: 2px;
+  border-left-color: #D3D3D3;
+}
+
+#yncngcwvzo .gt_heading {
+  background-color: #FFFFFF;
+  text-align: center;
+  border-bottom-color: #FFFFFF;
+  border-left-style: none;
+  border-left-width: 1px;
+  border-left-color: #D3D3D3;
+  border-right-style: none;
+  border-right-width: 1px;
+  border-right-color: #D3D3D3;
+}
+
+#yncngcwvzo .gt_title {
+  color: #333333;
+  font-size: 125%;
+  font-weight: initial;
+  padding-top: 4px;
+  padding-bottom: 4px;
+  border-bottom-color: #FFFFFF;
+  border-bottom-width: 0;
+}
+
+#yncngcwvzo .gt_subtitle {
+  color: #333333;
+  font-size: 85%;
+  font-weight: initial;
+  padding-top: 0;
+  padding-bottom: 6px;
+  border-top-color: #FFFFFF;
+  border-top-width: 0;
+}
+
+#yncngcwvzo .gt_bottom_border {
+  border-bottom-style: solid;
+  border-bottom-width: 2px;
+  border-bottom-color: #D3D3D3;
+}
+
+#yncngcwvzo .gt_col_headings {
+  border-top-style: solid;
+  border-top-width: 2px;
+  border-top-color: #D3D3D3;
+  border-bottom-style: solid;
+  border-bottom-width: 2px;
+  border-bottom-color: #D3D3D3;
+  border-left-style: none;
+  border-left-width: 1px;
+  border-left-color: #D3D3D3;
+  border-right-style: none;
+  border-right-width: 1px;
+  border-right-color: #D3D3D3;
+}
+
+#yncngcwvzo .gt_col_heading {
+  color: #333333;
+  background-color: #FFFFFF;
+  font-size: 100%;
+  font-weight: normal;
+  text-transform: inherit;
+  border-left-style: none;
+  border-left-width: 1px;
+  border-left-color: #D3D3D3;
+  border-right-style: none;
+  border-right-width: 1px;
+  border-right-color: #D3D3D3;
+  vertical-align: bottom;
+  padding-top: 5px;
+  padding-bottom: 6px;
+  padding-left: 5px;
+  padding-right: 5px;
+  overflow-x: hidden;
+}
+
+#yncngcwvzo .gt_column_spanner_outer {
+  color: #333333;
+  background-color: #FFFFFF;
+  font-size: 100%;
+  font-weight: normal;
+  text-transform: inherit;
+  padding-top: 0;
+  padding-bottom: 0;
+  padding-left: 4px;
+  padding-right: 4px;
+}
+
+#yncngcwvzo .gt_column_spanner_outer:first-child {
+  padding-left: 0;
+}
+
+#yncngcwvzo .gt_column_spanner_outer:last-child {
+  padding-right: 0;
+}
+
+#yncngcwvzo .gt_column_spanner {
+  border-bottom-style: solid;
+  border-bottom-width: 2px;
+  border-bottom-color: #D3D3D3;
+  vertical-align: bottom;
+  padding-top: 5px;
+  padding-bottom: 5px;
+  overflow-x: hidden;
+  display: inline-block;
+  width: 100%;
+}
+
+#yncngcwvzo .gt_group_heading {
+  padding: 8px;
+  color: #333333;
+  background-color: #FFFFFF;
+  font-size: 100%;
+  font-weight: initial;
+  text-transform: inherit;
+  border-top-style: solid;
+  border-top-width: 2px;
+  border-top-color: #D3D3D3;
+  border-bottom-style: solid;
+  border-bottom-width: 2px;
+  border-bottom-color: #D3D3D3;
+  border-left-style: none;
+  border-left-width: 1px;
+  border-left-color: #D3D3D3;
+  border-right-style: none;
+  border-right-width: 1px;
+  border-right-color: #D3D3D3;
+  vertical-align: middle;
+}
+
+#yncngcwvzo .gt_empty_group_heading {
+  padding: 0.5px;
+  color: #333333;
+  background-color: #FFFFFF;
+  font-size: 100%;
+  font-weight: initial;
+  border-top-style: solid;
+  border-top-width: 2px;
+  border-top-color: #D3D3D3;
+  border-bottom-style: solid;
+  border-bottom-width: 2px;
+  border-bottom-color: #D3D3D3;
+  vertical-align: middle;
+}
+
+#yncngcwvzo .gt_from_md > :first-child {
+  margin-top: 0;
+}
+
+#yncngcwvzo .gt_from_md > :last-child {
+  margin-bottom: 0;
+}
+
+#yncngcwvzo .gt_row {
+  padding-top: 8px;
+  padding-bottom: 8px;
+  padding-left: 5px;
+  padding-right: 5px;
+  margin: 10px;
+  border-top-style: solid;
+  border-top-width: 1px;
+  border-top-color: #D3D3D3;
+  border-left-style: none;
+  border-left-width: 1px;
+  border-left-color: #D3D3D3;
+  border-right-style: none;
+  border-right-width: 1px;
+  border-right-color: #D3D3D3;
+  vertical-align: middle;
+  overflow-x: hidden;
+}
+
+#yncngcwvzo .gt_stub {
+  color: #333333;
+  background-color: #FFFFFF;
+  font-size: 100%;
+  font-weight: initial;
+  text-transform: inherit;
+  border-right-style: solid;
+  border-right-width: 2px;
+  border-right-color: #D3D3D3;
+  padding-left: 12px;
+}
+
+#yncngcwvzo .gt_summary_row {
+  color: #333333;
+  background-color: #FFFFFF;
+  text-transform: inherit;
+  padding-top: 8px;
+  padding-bottom: 8px;
+  padding-left: 5px;
+  padding-right: 5px;
+}
+
+#yncngcwvzo .gt_first_summary_row {
+  padding-top: 8px;
+  padding-bottom: 8px;
+  padding-left: 5px;
+  padding-right: 5px;
+  border-top-style: solid;
+  border-top-width: 2px;
+  border-top-color: #D3D3D3;
+}
+
+#yncngcwvzo .gt_grand_summary_row {
+  color: #333333;
+  background-color: #FFFFFF;
+  text-transform: inherit;
+  padding-top: 8px;
+  padding-bottom: 8px;
+  padding-left: 5px;
+  padding-right: 5px;
+}
+
+#yncngcwvzo .gt_first_grand_summary_row {
+  padding-top: 8px;
+  padding-bottom: 8px;
+  padding-left: 5px;
+  padding-right: 5px;
+  border-top-style: double;
+  border-top-width: 6px;
+  border-top-color: #D3D3D3;
+}
+
+#yncngcwvzo .gt_striped {
+  background-color: rgba(128, 128, 128, 0.05);
+}
+
+#yncngcwvzo .gt_table_body {
+  border-top-style: solid;
+  border-top-width: 2px;
+  border-top-color: #D3D3D3;
+  border-bottom-style: solid;
+  border-bottom-width: 2px;
+  border-bottom-color: #D3D3D3;
+}
+
+#yncngcwvzo .gt_footnotes {
+  color: #333333;
+  background-color: #FFFFFF;
+  border-bottom-style: none;
+  border-bottom-width: 2px;
+  border-bottom-color: #D3D3D3;
+  border-left-style: none;
+  border-left-width: 2px;
+  border-left-color: #D3D3D3;
+  border-right-style: none;
+  border-right-width: 2px;
+  border-right-color: #D3D3D3;
+}
+
+#yncngcwvzo .gt_footnote {
+  margin: 0px;
+  font-size: 90%;
+  padding: 4px;
+}
+
+#yncngcwvzo .gt_sourcenotes {
+  color: #333333;
+  background-color: #FFFFFF;
+  border-bottom-style: none;
+  border-bottom-width: 2px;
+  border-bottom-color: #D3D3D3;
+  border-left-style: none;
+  border-left-width: 2px;
+  border-left-color: #D3D3D3;
+  border-right-style: none;
+  border-right-width: 2px;
+  border-right-color: #D3D3D3;
+}
+
+#yncngcwvzo .gt_sourcenote {
+  font-size: 90%;
+  padding: 4px;
+}
+
+#yncngcwvzo .gt_left {
+  text-align: left;
+}
+
+#yncngcwvzo .gt_center {
+  text-align: center;
+}
+
+#yncngcwvzo .gt_right {
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+}
+
+#yncngcwvzo .gt_font_normal {
+  font-weight: normal;
+}
+
+#yncngcwvzo .gt_font_bold {
+  font-weight: bold;
+}
+
+#yncngcwvzo .gt_font_italic {
+  font-style: italic;
+}
+
+#yncngcwvzo .gt_super {
+  font-size: 65%;
+}
+
+#yncngcwvzo .gt_footnote_marks {
+  font-style: italic;
+  font-weight: normal;
+  font-size: 65%;
+}
+</style>
+<table class="gt_table">
+  <thead class="gt_header">
+    <tr>
+      <th colspan="3" class="gt_heading gt_title gt_font_normal" style>Cross tabulation protein dependence</th>
+    </tr>
+    <tr>
+      <th colspan="3" class="gt_heading gt_subtitle gt_font_normal gt_bottom_border" style>Rand Index is 0.623</th>
+    </tr>
+  </thead>
+  <thead class="gt_col_headings">
+    <tr>
+      <th class="gt_col_heading gt_columns_bottom_border gt_left" rowspan="1" colspan="1">IGHV</th>
+      <th class="gt_col_heading gt_columns_bottom_border gt_right" rowspan="1" colspan="1">Cluster1</th>
+      <th class="gt_col_heading gt_columns_bottom_border gt_right" rowspan="1" colspan="1">Cluster2</th>
+    </tr>
+  </thead>
+  <tbody class="gt_table_body">
+    <tr><td class="gt_row gt_left">M</td>
+<td class="gt_row gt_right">55</td>
+<td class="gt_row gt_right">5</td></tr>
+    <tr><td class="gt_row gt_left">U</td>
+<td class="gt_row gt_right">7</td>
+<td class="gt_row gt_right">48</td></tr>
+  </tbody>
+  
+  
+</table>
+</div>
+<pre class="r"><code># drug screen
+externalClust(kclus_tab_drug, km_res_drug , header = &quot;Cross tabulation drug screen&quot;)</code></pre>
+<div id="uehsjrjlbj" style="overflow-x:auto;overflow-y:auto;width:auto;height:auto;">
+<style>html {
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, 'Helvetica Neue', 'Fira Sans', 'Droid Sans', Arial, sans-serif;
+}
+
+#uehsjrjlbj .gt_table {
+  display: table;
+  border-collapse: collapse;
+  margin-left: auto;
+  margin-right: auto;
+  color: #333333;
+  font-size: 16px;
+  font-weight: normal;
+  font-style: normal;
+  background-color: #FFFFFF;
+  width: auto;
+  border-top-style: solid;
+  border-top-width: 2px;
+  border-top-color: #A8A8A8;
+  border-right-style: none;
+  border-right-width: 2px;
+  border-right-color: #D3D3D3;
+  border-bottom-style: solid;
+  border-bottom-width: 2px;
+  border-bottom-color: #A8A8A8;
+  border-left-style: none;
+  border-left-width: 2px;
+  border-left-color: #D3D3D3;
+}
+
+#uehsjrjlbj .gt_heading {
+  background-color: #FFFFFF;
+  text-align: center;
+  border-bottom-color: #FFFFFF;
+  border-left-style: none;
+  border-left-width: 1px;
+  border-left-color: #D3D3D3;
+  border-right-style: none;
+  border-right-width: 1px;
+  border-right-color: #D3D3D3;
+}
+
+#uehsjrjlbj .gt_title {
+  color: #333333;
+  font-size: 125%;
+  font-weight: initial;
+  padding-top: 4px;
+  padding-bottom: 4px;
+  border-bottom-color: #FFFFFF;
+  border-bottom-width: 0;
+}
+
+#uehsjrjlbj .gt_subtitle {
+  color: #333333;
+  font-size: 85%;
+  font-weight: initial;
+  padding-top: 0;
+  padding-bottom: 6px;
+  border-top-color: #FFFFFF;
+  border-top-width: 0;
+}
+
+#uehsjrjlbj .gt_bottom_border {
+  border-bottom-style: solid;
+  border-bottom-width: 2px;
+  border-bottom-color: #D3D3D3;
+}
+
+#uehsjrjlbj .gt_col_headings {
+  border-top-style: solid;
+  border-top-width: 2px;
+  border-top-color: #D3D3D3;
+  border-bottom-style: solid;
+  border-bottom-width: 2px;
+  border-bottom-color: #D3D3D3;
+  border-left-style: none;
+  border-left-width: 1px;
+  border-left-color: #D3D3D3;
+  border-right-style: none;
+  border-right-width: 1px;
+  border-right-color: #D3D3D3;
+}
+
+#uehsjrjlbj .gt_col_heading {
+  color: #333333;
+  background-color: #FFFFFF;
+  font-size: 100%;
+  font-weight: normal;
+  text-transform: inherit;
+  border-left-style: none;
+  border-left-width: 1px;
+  border-left-color: #D3D3D3;
+  border-right-style: none;
+  border-right-width: 1px;
+  border-right-color: #D3D3D3;
+  vertical-align: bottom;
+  padding-top: 5px;
+  padding-bottom: 6px;
+  padding-left: 5px;
+  padding-right: 5px;
+  overflow-x: hidden;
+}
+
+#uehsjrjlbj .gt_column_spanner_outer {
+  color: #333333;
+  background-color: #FFFFFF;
+  font-size: 100%;
+  font-weight: normal;
+  text-transform: inherit;
+  padding-top: 0;
+  padding-bottom: 0;
+  padding-left: 4px;
+  padding-right: 4px;
+}
+
+#uehsjrjlbj .gt_column_spanner_outer:first-child {
+  padding-left: 0;
+}
+
+#uehsjrjlbj .gt_column_spanner_outer:last-child {
+  padding-right: 0;
+}
+
+#uehsjrjlbj .gt_column_spanner {
+  border-bottom-style: solid;
+  border-bottom-width: 2px;
+  border-bottom-color: #D3D3D3;
+  vertical-align: bottom;
+  padding-top: 5px;
+  padding-bottom: 5px;
+  overflow-x: hidden;
+  display: inline-block;
+  width: 100%;
+}
+
+#uehsjrjlbj .gt_group_heading {
+  padding: 8px;
+  color: #333333;
+  background-color: #FFFFFF;
+  font-size: 100%;
+  font-weight: initial;
+  text-transform: inherit;
+  border-top-style: solid;
+  border-top-width: 2px;
+  border-top-color: #D3D3D3;
+  border-bottom-style: solid;
+  border-bottom-width: 2px;
+  border-bottom-color: #D3D3D3;
+  border-left-style: none;
+  border-left-width: 1px;
+  border-left-color: #D3D3D3;
+  border-right-style: none;
+  border-right-width: 1px;
+  border-right-color: #D3D3D3;
+  vertical-align: middle;
+}
+
+#uehsjrjlbj .gt_empty_group_heading {
+  padding: 0.5px;
+  color: #333333;
+  background-color: #FFFFFF;
+  font-size: 100%;
+  font-weight: initial;
+  border-top-style: solid;
+  border-top-width: 2px;
+  border-top-color: #D3D3D3;
+  border-bottom-style: solid;
+  border-bottom-width: 2px;
+  border-bottom-color: #D3D3D3;
+  vertical-align: middle;
+}
+
+#uehsjrjlbj .gt_from_md > :first-child {
+  margin-top: 0;
+}
+
+#uehsjrjlbj .gt_from_md > :last-child {
+  margin-bottom: 0;
+}
+
+#uehsjrjlbj .gt_row {
+  padding-top: 8px;
+  padding-bottom: 8px;
+  padding-left: 5px;
+  padding-right: 5px;
+  margin: 10px;
+  border-top-style: solid;
+  border-top-width: 1px;
+  border-top-color: #D3D3D3;
+  border-left-style: none;
+  border-left-width: 1px;
+  border-left-color: #D3D3D3;
+  border-right-style: none;
+  border-right-width: 1px;
+  border-right-color: #D3D3D3;
+  vertical-align: middle;
+  overflow-x: hidden;
+}
+
+#uehsjrjlbj .gt_stub {
+  color: #333333;
+  background-color: #FFFFFF;
+  font-size: 100%;
+  font-weight: initial;
+  text-transform: inherit;
+  border-right-style: solid;
+  border-right-width: 2px;
+  border-right-color: #D3D3D3;
+  padding-left: 12px;
+}
+
+#uehsjrjlbj .gt_summary_row {
+  color: #333333;
+  background-color: #FFFFFF;
+  text-transform: inherit;
+  padding-top: 8px;
+  padding-bottom: 8px;
+  padding-left: 5px;
+  padding-right: 5px;
+}
+
+#uehsjrjlbj .gt_first_summary_row {
+  padding-top: 8px;
+  padding-bottom: 8px;
+  padding-left: 5px;
+  padding-right: 5px;
+  border-top-style: solid;
+  border-top-width: 2px;
+  border-top-color: #D3D3D3;
+}
+
+#uehsjrjlbj .gt_grand_summary_row {
+  color: #333333;
+  background-color: #FFFFFF;
+  text-transform: inherit;
+  padding-top: 8px;
+  padding-bottom: 8px;
+  padding-left: 5px;
+  padding-right: 5px;
+}
+
+#uehsjrjlbj .gt_first_grand_summary_row {
+  padding-top: 8px;
+  padding-bottom: 8px;
+  padding-left: 5px;
+  padding-right: 5px;
+  border-top-style: double;
+  border-top-width: 6px;
+  border-top-color: #D3D3D3;
+}
+
+#uehsjrjlbj .gt_striped {
+  background-color: rgba(128, 128, 128, 0.05);
+}
+
+#uehsjrjlbj .gt_table_body {
+  border-top-style: solid;
+  border-top-width: 2px;
+  border-top-color: #D3D3D3;
+  border-bottom-style: solid;
+  border-bottom-width: 2px;
+  border-bottom-color: #D3D3D3;
+}
+
+#uehsjrjlbj .gt_footnotes {
+  color: #333333;
+  background-color: #FFFFFF;
+  border-bottom-style: none;
+  border-bottom-width: 2px;
+  border-bottom-color: #D3D3D3;
+  border-left-style: none;
+  border-left-width: 2px;
+  border-left-color: #D3D3D3;
+  border-right-style: none;
+  border-right-width: 2px;
+  border-right-color: #D3D3D3;
+}
+
+#uehsjrjlbj .gt_footnote {
+  margin: 0px;
+  font-size: 90%;
+  padding: 4px;
+}
+
+#uehsjrjlbj .gt_sourcenotes {
+  color: #333333;
+  background-color: #FFFFFF;
+  border-bottom-style: none;
+  border-bottom-width: 2px;
+  border-bottom-color: #D3D3D3;
+  border-left-style: none;
+  border-left-width: 2px;
+  border-left-color: #D3D3D3;
+  border-right-style: none;
+  border-right-width: 2px;
+  border-right-color: #D3D3D3;
+}
+
+#uehsjrjlbj .gt_sourcenote {
+  font-size: 90%;
+  padding: 4px;
+}
+
+#uehsjrjlbj .gt_left {
+  text-align: left;
+}
+
+#uehsjrjlbj .gt_center {
+  text-align: center;
+}
+
+#uehsjrjlbj .gt_right {
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+}
+
+#uehsjrjlbj .gt_font_normal {
+  font-weight: normal;
+}
+
+#uehsjrjlbj .gt_font_bold {
+  font-weight: bold;
+}
+
+#uehsjrjlbj .gt_font_italic {
+  font-style: italic;
+}
+
+#uehsjrjlbj .gt_super {
+  font-size: 65%;
+}
+
+#uehsjrjlbj .gt_footnote_marks {
+  font-style: italic;
+  font-weight: normal;
+  font-size: 65%;
+}
+</style>
+<table class="gt_table">
+  <thead class="gt_header">
+    <tr>
+      <th colspan="3" class="gt_heading gt_title gt_font_normal" style>Cross tabulation drug screen</th>
+    </tr>
+    <tr>
+      <th colspan="3" class="gt_heading gt_subtitle gt_font_normal gt_bottom_border" style>Rand Index is 0.146</th>
+    </tr>
+  </thead>
+  <thead class="gt_col_headings">
+    <tr>
+      <th class="gt_col_heading gt_columns_bottom_border gt_left" rowspan="1" colspan="1">IGHV</th>
+      <th class="gt_col_heading gt_columns_bottom_border gt_right" rowspan="1" colspan="1">Cluster1</th>
+      <th class="gt_col_heading gt_columns_bottom_border gt_right" rowspan="1" colspan="1">Cluster2</th>
+    </tr>
+  </thead>
+  <tbody class="gt_table_body">
+    <tr><td class="gt_row gt_left">M</td>
+<td class="gt_row gt_right">47</td>
+<td class="gt_row gt_right">13</td></tr>
+    <tr><td class="gt_row gt_left">U</td>
+<td class="gt_row gt_right">22</td>
+<td class="gt_row gt_right">33</td></tr>
+  </tbody>
+  
+  
+</table>
+</div>
+</div>
+</div>
+<div id="differential-dependence-on-proteins-associated-with-genotype" class="section level1">
+<h1>Differential dependence on proteins associated with genotype</h1>
+<p>Prepare genomic background table</p>
+<pre class="r"><code>patAnno &lt;- dplyr::select(annotation_EMBL, -sex, -treatment, -date.of.first.treatment)</code></pre>
+<p>Association test between protein dependence and genetic background</p>
+<pre class="r"><code>geneBack &lt;- patAnno %&gt;% data.frame() %&gt;% remove_rownames() %&gt;%
+    column_to_rownames(&quot;Patient.ID&quot;)
+
+testRes_cll &lt;- diffImportance(coefMat_cll, geneBack)</code></pre>
+<div id="visualization-of-identified-associations" class="section level2">
+<h2>Visualization of identified associations</h2>
+<pre class="r"><code>#define color
+colList &lt;- c(`not significant` = &quot;grey80&quot;, &quot;Tris12 positive / U-IGHV&quot; = &quot;#BC3C29FF&quot;, &quot;Tris12 negative / M-IGHV&quot; = &quot;#0072B5FF&quot;)
+pos = position_jitter(width = 0.25, seed = 10)
+
+plotTab &lt;- testRes_cll %&gt;% dplyr::filter(mutName %in% c(&quot;IGHV.status&quot;, &quot;trisomy12&quot;)) %&gt;% mutate(type = ifelse(p.adj &gt; 0.1, &quot;not significant&quot;, 
+                                          ifelse(FC &gt;0, &quot;Tris12 positive / U-IGHV&quot;,&quot;Tris12 negative / M-IGHV&quot;))) %&gt;%
+  mutate(varName = ifelse(type == &quot;not significant&quot;,&quot;&quot;,targetName)) 
+
+plotTab &lt;- plotTab %&gt;% dplyr::filter(mutName %in% plotTab$mutName[1:19]) %&gt;%
+  mutate(mutName = str_replace(mutName,&quot;[.]&quot;,&quot; &quot;))
+
+p &lt;- ggplot(data=plotTab, aes(x= mutName, y=-log10(p.adj),
+                              col=type, label = varName))+ 
+  geom_hline(yintercept = -log10(0.1), linetype=&quot;dotted&quot;, color = &quot;grey20&quot;) + 
+  geom_point(size=3, position = pos) + 
+  geom_text_repel(position = pos, color = &quot;black&quot;, size= 6, force = 3) +
+  ylab(expression(-log[10]*&#39;(&#39;*adjusted~italic(&quot;P&quot;)~value*&#39;)&#39;)) + xlab(&quot;&quot;) +
+  scale_color_manual(values = colList) +
+  theme_custom +
+  #annotate(geom = &quot;text&quot;, x = 0.5, y = -log10(0.1) - 0.25, label = &quot;10% FDR&quot;, size=7, col = &quot;grey20&quot;) +
+  coord_flip()  + labs(col = &quot;Higher dependence in&quot;)  +
+  theme(legend.position = c(0.75,0.8),
+        legend.background = element_rect(fill = NA),
+        legend.text = element_text(size=14),
+        legend.title = element_text(size=16),
+        axis.title = element_text(size=18),
+        axis.text = element_text(size=18))
+plot(p)</code></pre>
+<pre><code>Warning: ggrepel: 2 unlabeled data points (too many overlaps). Consider
+increasing max.overlaps</code></pre>
+<p><img src="figure/analysis_EMBL2016.Rmd/EMBL_geneCoef_association-1.png" width="768" style="display: block; margin: auto;" /></p>
+<pre class="r"><code>#ggsave(&quot;test.pdf&quot;, height = 4, width = 8)</code></pre>
+<p>Visualize significant associations using a heatmap</p>
+<pre class="r"><code>plotTab &lt;- testRes_cll %&gt;% dplyr::filter(mutName %in% c(&quot;IGHV.status&quot;, &quot;trisomy12&quot;)) %&gt;% 
+  mutate(starSign = ifelse(p.adj &lt;=0.1, &quot;*&quot;, &quot;&quot;),
+         pSign = -log10(p)*sign(FC))
+
+#subset for mutation with at least one significant associations
+plotTar &lt;- unique(filter(plotTab, p.adj &lt;= 0.1)$targetName)
+plotMut &lt;- unique(filter(plotTab, p.adj &lt;= 0.1)$mutName)
+plotTab &lt;- plotTab %&gt;% dplyr::filter( targetName %in% plotTar , mutName %in% plotMut) 
+
+
+p &lt;- ggplot(data=plotTab, aes(y=mutName, x = targetName, fill=pSign)) +
+  geom_tile(col = &quot;black&quot;) + geom_text(aes(label = starSign), size=5, vjust=0.5) +
+  scale_fill_gradient2(low = &quot;#BC3C29FF&quot;, high = &quot;#0072B5FF&quot;, name = bquote(-log[10]*italic(&quot;P&quot;))) +
+  theme_minimal() +
+  theme(panel.grid.major = element_blank(),
+        legend.text = element_text(size=14),
+        legend.title = element_text(size=16),
+        axis.title = element_text(size=18),
+        axis.text.y = element_text(size=18),
+        axis.text.x = element_text(size=18, angle = 90, vjust=.5, hjust=1)) +
+  ylab(&quot;Mutations&quot;) + xlab(&quot;Proteins&quot;)
+
+p</code></pre>
+<p><img src="figure/analysis_EMBL2016.Rmd/embl_pval_Heatmap-1.png" width="768" style="display: block; margin: auto;" /></p>
+<p>Visualization of exemplary associations in beeswarm plots</p>
+<pre class="r"><code>pList &lt;- plotDiffBox(testRes_cll, coefMat_cll, geneBack, fdrCut = 0.05)</code></pre>
+<pre class="r"><code>cowplot::plot_grid(pList$BTK_IGHV.status, 
+                   pList$SIK2_IGHV.status + theme(axis.title.y = element_blank()), 
+                   pList$INPPL1_IGHV.status + theme(axis.title.y = element_blank()), 
+                   pList$MAP2K2_trisomy12+theme(axis.title.y = element_blank()), nrow=1,
+                   rel_widths = c(1.05,1,1,1))</code></pre>
+<p><img src="figure/analysis_EMBL2016.Rmd/EMBL_coefBox-1.png" width="1440" style="display: block; margin: auto;" /></p>
+</div>
+</div>
+<div id="check-differential-effect-of-chk1-inhibitors-without-bcr-pathway-related-off-targets" class="section level1">
+<h1>Check differential effect of CHK1 inhibitors (without BCR-pathway related off-targets)</h1>
+<div id="differential-importance-of-chk1-related-to-ighv-status" class="section level2">
+<h2>Differential importance of CHK1 related to IGHV status</h2>
+<pre class="r"><code>pList$CHEK1_IGHV.status</code></pre>
+<p><img src="figure/analysis_EMBL2016.Rmd/CHK1_boxplot-1.png" width="384" style="display: block; margin: auto;" /></p>
+</div>
+<div id="preprocessing-of-screening-data" class="section level2">
+<h2>Preprocessing of screening data</h2>
+<p>Preprocessing the data (EMBL)</p>
+<pre class="r"><code>#seperate the names &quot;A;B&quot; to A B
+expandName &lt;- group_by(targetsEMBL, drugName, targetName) %&gt;% do(data.frame(newTar = str_split(.$targetName, &quot;;&quot;)[[1]], stringsAsFactors = FALSE))
+targetsEMBL &lt;- left_join(targetsEMBL, expandName, by = c(&quot;drugName&quot;,&quot;targetName&quot;)) %&gt;%
+  mutate(targetName = newTar) %&gt;% dplyr::select(-newTar)
+
+#get high confidence targets
+highTargets_EMBL &lt;- filter(targetsEMBL, targetClassification == &quot;High confidence&quot;) %&gt;% filter(Kd &lt; 1000)</code></pre>
+</div>
+<div id="visulization-of-the-target-network-for-interesting-embl-targets" class="section level2">
+<h2>Visulization of the target network for interesting EMBL targets</h2>
+<pre class="r"><code>CLLtargetList &lt;- c(&quot;BTK&quot;, &quot;CHEK1&quot;,&quot;YES1&quot;, &quot;LYN&quot;, &quot;SYK&quot;)
+inhibitorList &lt;- unique(filter(highTargets_EMBL, targetName == &quot;CHEK1&quot;)$drugName)
+highTargetsCLL &lt;- filter(highTargets_EMBL, targetName %in% CLLtargetList, drugName %in% inhibitorList)
+
+plotTab &lt;- dplyr::select(highTargetsCLL, drugName, targetName)
+nodeAttr &lt;- gather(plotTab, key = &quot;type&quot;, value = &quot;name&quot;, drugName, targetName) %&gt;%
+  filter(!duplicated(name)) %&gt;%
+  mutate(type = ifelse(type == &quot;targetName&quot;, &quot;target&quot;, &quot;drug&quot;))
+
+g &lt;- graph_from_edgelist(as.matrix(plotTab))
+
+V(g)$nodeType &lt;- nodeAttr[match(V(g)$name, nodeAttr$name),]$type
+V(g)$shape &lt;- ifelse(V(g)$nodeType == &quot;drug&quot;, &quot;none&quot;,&quot;circle&quot;)
+V(g)$color &lt;- ifelse(V(g)$nodeType == &quot;drug&quot;, &quot;white&quot;,&quot;grey80&quot;)
+V(g)$label.color = ifelse(V(g)$name %in% c(&quot;MK-8776&quot;,&quot;Rabusertib&quot;,&quot;PF-3758309&quot;), &quot;#BC3C29FF&quot;,&quot;black&quot;)
+
+V(g)$label.cex &lt;- 1.5
+plot(g, layout=layout_with_kk, vertex.label.family = &quot;Helvetica&quot;, vertex.size=30)</code></pre>
+<p><img src="figure/analysis_EMBL2016.Rmd/CHK1_net-1.png" width="1056" style="display: block; margin: auto;" /> The drugs without BTK-related off-targets are: Rabusertib (1903601), MK-8776 (1903751), PF-3758309 (1904171)</p>
+</div>
+<div id="check-differential-effect-of-these-drugs-on-cll-samples" class="section level2">
+<h2>Check differential effect of these drugs on CLL samples</h2>
+<pre class="r"><code>drugList &lt;- c(&quot;1903601&quot;,&quot;1903751&quot;,&quot;1904171&quot;)
+# BeatAML screening data
+screenData &lt;- readxl::read_xlsx(&quot;../data/EMBL2016/EMBL2016_screen.xlsx&quot;) %&gt;%
+  filter(drugID %in% drugList,concIndex %in% seq(1,9)) %&gt;%
+  group_by(patID, name) %&gt;%
+  summarise(viab = mean(normVal.sigm))</code></pre>
+<pre><code>`summarise()` has grouped output by &#39;patID&#39;. You can override using the `.groups` argument.</code></pre>
+<pre class="r"><code>testTab &lt;- screenData %&gt;% left_join(select(annotation_EMBL,Patient.ID,IGHV.status, diagnosis), by = c(patID = &quot;Patient.ID&quot;)) %&gt;%
+  filter(diagnosis == &quot;CLL&quot;, !is.na(IGHV.status))</code></pre>
+<p>T-test</p>
+<pre class="r"><code>resTab &lt;- testTab %&gt;% group_by(name) %&gt;%
+  nest() %&gt;%
+  mutate(m = map(data, ~t.test(viab~IGHV.status,.))) %&gt;%
+  mutate(res = map(m, broom::tidy)) %&gt;%
+  unnest(res) %&gt;%
+  select(name, estimate, p.value) %&gt;%
+  arrange(p.value)</code></pre>
+<pre class="r"><code>pList &lt;- lapply(seq(nrow(resTab)), function(i) {
+    
+    drug &lt;- resTab[i,]$name
+    pval &lt;- resTab[i,]$p.value
+    plotTab &lt;- testTab %&gt;% filter(name == drug) %&gt;%
+      filter(!is.na(IGHV.status)) %&gt;%
+      mutate(IGHV.status = ifelse(IGHV.status == &quot;U&quot;,&quot;Unmutated&quot;,&quot;Mutated&quot;))
+    #count cases
+    
+    numTab &lt;- group_by(plotTab, IGHV.status) %&gt;%
+      summarise(n=length(patID))
+
+    plotTab &lt;- left_join(plotTab, numTab, by = &quot;IGHV.status&quot;) %&gt;%
+      mutate(mutNum = sprintf(&quot;%s\n(n=%s)&quot;, IGHV.status, n)) %&gt;%
+      mutate(mutNum = factor(mutNum, levels = unique(mutNum)))
+
+    titleText &lt;- sprintf(&quot;%s ~ IGHV status&quot;, drug)
+    pval &lt;- formatNum(pval, digits = 1, format=&quot;e&quot;)
+    titleText &lt;- bquote(atop(.(titleText), &quot;(&quot;~italic(&quot;P&quot;)~&quot;=&quot;~.(pval)~&quot;)&quot;))
+
+    ggplot(plotTab, aes(x = mutNum,y = viab)) +
+      stat_boxplot(geom = &quot;errorbar&quot;, width = 0.3) +
+      geom_boxplot(outlier.shape = NA, col=&quot;black&quot;, width=0.4) +
+      geom_beeswarm(cex=2, size =1, aes(col = mutNum)) + theme_classic() +
+      xlab(&quot;&quot;) + ylab(&quot;Viability&quot;) + ggtitle(titleText) + xlab(&quot;&quot;) +
+      scale_color_manual(values = c(&quot;#0072B5FF&quot;,&quot;#BC3C29FF&quot;)) +
+      ylim(0.5, 1.2) +
+      theme(axis.line.x = element_blank(), axis.ticks.x = element_blank(),
+            axis.title = element_text(size=18),
+            axis.text = element_text(size=18),
+            plot.title = element_text(size= 18, face = &quot;bold&quot;, hjust = 0.5),
+            legend.position = &quot;none&quot;,
+            axis.title.x = element_text(face=&quot;bold&quot;))
+})
+noY &lt;- theme(axis.line.y = element_blank(), axis.ticks.y = element_blank(), 
+             axis.text.y = element_blank(), axis.title.y = element_blank())
+cowplot::plot_grid(pList[[1]],pList[[2]]+noY, pList[[3]] + noY, nrow=1,
+                   rel_widths = c(1.1,1,1))</code></pre>
+<p><img src="figure/analysis_EMBL2016.Rmd/CHK_IGHV-1.png" width="960" style="display: block; margin: auto;" /></p>
+<br>
+<p>
+<button type="button" class="btn btn-default btn-workflowr btn-workflowr-sessioninfo" data-toggle="collapse" data-target="#workflowr-sessioninfo" style="display: block;">
+<span class="glyphicon glyphicon-wrench" aria-hidden="true"></span> Session information
+</button>
+</p>
+<div id="workflowr-sessioninfo" class="collapse">
+<pre class="r"><code>sessionInfo()</code></pre>
+<pre><code>R version 4.0.2 (2020-06-22)
+Platform: x86_64-apple-darwin17.0 (64-bit)
+Running under: macOS  10.16
+
+Matrix products: default
+BLAS:   /Library/Frameworks/R.framework/Versions/4.0/Resources/lib/libRblas.dylib
+LAPACK: /Library/Frameworks/R.framework/Versions/4.0/Resources/lib/libRlapack.dylib
+
+locale:
+[1] en_US.UTF-8/en_US.UTF-8/en_US.UTF-8/C/en_US.UTF-8/en_US.UTF-8
+
+attached base packages:
+[1] stats     graphics  grDevices utils     datasets  methods   base     
+
+other attached packages:
+ [1] forcats_0.5.1      stringr_1.4.0      dplyr_1.0.7        purrr_0.3.4       
+ [5] readr_2.0.0        tidyr_1.1.3        tibble_3.1.3       tidyverse_1.3.1   
+ [9] factoextra_1.0.7   igraph_1.2.6       fpc_2.2-9          ggrepel_0.9.1     
+[13] ggbeeswarm_0.6.0   ggplot2_3.3.5      pheatmap_1.0.12    RColorBrewer_1.1-2
+[17] depInfeR_0.1.0    
+
+loaded via a namespace (and not attached):
+  [1] colorspace_2.0-2   ggsignif_0.6.2     ellipsis_0.3.2    
+  [4] class_7.3-19       modeltools_0.2-23  rio_0.5.27        
+  [7] mclust_5.4.7       rprojroot_2.0.2    fs_1.5.0          
+ [10] rstudioapi_0.13    ggpubr_0.4.0       farver_2.1.0      
+ [13] flexmix_2.3-17     fansi_0.5.0        lubridate_1.7.10  
+ [16] xml2_1.3.2         codetools_0.2-18   splines_4.0.2     
+ [19] doParallel_1.0.16  robustbase_0.93-8  knitr_1.33        
+ [22] rlist_0.4.6.1      jsonlite_1.7.2     workflowr_1.6.2   
+ [25] gt_0.3.1           broom_0.7.9        cluster_2.1.2     
+ [28] kernlab_0.9-29     dbplyr_2.1.1       compiler_4.0.2    
+ [31] httr_1.4.2         backports_1.2.1    assertthat_0.2.1  
+ [34] Matrix_1.3-4       cli_3.0.1          later_1.2.0       
+ [37] htmltools_0.5.1.1  tools_4.0.2        gtable_0.3.0      
+ [40] glue_1.4.2         Rcpp_1.0.7         carData_3.0-4     
+ [43] cellranger_1.1.0   jquerylib_0.1.4    vctrs_0.3.8       
+ [46] iterators_1.0.13   xfun_0.24          openxlsx_4.2.4    
+ [49] rvest_1.0.1        lifecycle_1.0.0    rstatix_0.7.0     
+ [52] DEoptimR_1.0-9     MASS_7.3-54        scales_1.1.1      
+ [55] hms_1.1.0          promises_1.2.0.1   parallel_4.0.2    
+ [58] yaml_2.2.1         curl_4.3.2         sass_0.4.0        
+ [61] stringi_1.7.3      highr_0.9          foreach_1.5.1     
+ [64] checkmate_2.0.0    zip_2.2.0          shape_1.4.6       
+ [67] rlang_0.4.11       pkgconfig_2.0.3    prabclus_2.3-2    
+ [70] matrixStats_0.60.0 evaluate_0.14      lattice_0.20-44   
+ [73] labeling_0.4.2     cowplot_1.1.1      tidyselect_1.1.1  
+ [76] magrittr_2.0.1     R6_2.5.0           generics_0.1.0    
+ [79] DBI_1.1.1          pillar_1.6.2       haven_2.4.1       
+ [82] foreign_0.8-81     withr_2.4.2        abind_1.4-5       
+ [85] survival_3.2-11    nnet_7.3-16        modelr_0.1.8      
+ [88] crayon_1.4.1       car_3.0-11         utf8_1.2.2        
+ [91] tzdb_0.1.2         rmarkdown_2.9      grid_4.0.2        
+ [94] readxl_1.3.1       data.table_1.14.0  git2r_0.28.0      
+ [97] reprex_2.0.0       digest_0.6.27      diptest_0.76-0    
+[100] httpuv_1.6.1       stats4_4.0.2       munsell_0.5.0     
+[103] glmnet_4.1-2       beeswarm_0.4.0     vipor_0.4.5       
+[106] bslib_0.2.5.1     </code></pre>
+</div>
+</div>
+</div>
+
+
+<!-- Adjust MathJax settings so that all math formulae are shown using
+TeX fonts only; see
+http://docs.mathjax.org/en/latest/configuration.html.  This will make
+the presentation more consistent at the cost of the webpage sometimes
+taking slightly longer to load. Note that this only works because the
+footer is added to webpages before the MathJax javascript. -->
+<script type="text/x-mathjax-config">
+  MathJax.Hub.Config({
+    "HTML-CSS": { availableFonts: ["TeX"] }
+  });
+</script>
+
+
+
+
+</div>
+</div>
+
+</div>
+
+<script>
+
+// add bootstrap table styles to pandoc tables
+function bootstrapStylePandocTables() {
+  $('tr.odd').parent('tbody').parent('table').addClass('table table-condensed');
+}
+$(document).ready(function () {
+  bootstrapStylePandocTables();
+});
+
+
+</script>
+
+<!-- tabsets -->
+
+<script>
+$(document).ready(function () {
+  window.buildTabsets("TOC");
+});
+
+$(document).ready(function () {
+  $('.tabset-dropdown > .nav-tabs > li').click(function () {
+    $(this).parent().toggleClass('nav-tabs-open');
+  });
+});
+</script>
+
+<!-- code folding -->
+
+<script>
+$(document).ready(function ()  {
+
+    // temporarily add toc-ignore selector to headers for the consistency with Pandoc
+    $('.unlisted.unnumbered').addClass('toc-ignore')
+
+    // move toc-ignore selectors from section div to header
+    $('div.section.toc-ignore')
+        .removeClass('toc-ignore')
+        .children('h1,h2,h3,h4,h5').addClass('toc-ignore');
+
+    // establish options
+    var options = {
+      selectors: "h1,h2,h3",
+      theme: "bootstrap3",
+      context: '.toc-content',
+      hashGenerator: function (text) {
+        return text.replace(/[.\\/?&!#<>]/g, '').replace(/\s/g, '_');
+      },
+      ignoreSelector: ".toc-ignore",
+      scrollTo: 0
+    };
+    options.showAndHide = true;
+    options.smoothScroll = true;
+
+    // tocify
+    var toc = $("#TOC").tocify(options).data("toc-tocify");
+});
+</script>
+
+<!-- dynamically load mathjax for compatibility with self-contained -->
+<script>
+  (function () {
+    var script = document.createElement("script");
+    script.type = "text/javascript";
+    script.src  = "https://mathjax.rstudio.com/latest/MathJax.js?config=TeX-AMS-MML_HTMLorMML";
+    document.getElementsByTagName("head")[0].appendChild(script);
+  })();
+</script>
+
+</body>
+</html>

@@ -1,0 +1,332 @@
+---
+title: "Pre-processing BeatAML drug screen datasets"
+author: "Junyan Lu"
+date: "2021-10-05"
+output: workflowr::wflow_html
+editor_options:
+  chunk_output_type: inline
+---
+
+# Introduction
+
+
+Paper: https://www.nature.com/articles/s41586-018-0623-z  
+Data download: https://ctd2-data.nci.nih.gov/Public/OHSU-1/BeatAML_Waves1_2/
+
+***
+
+# Load packages
+
+Packages
+```{r message=FALSE, warning=FALSE}
+library(depInfeR)
+library(missForest)
+library(DESeq2)
+library(tidyverse)
+source("../code/utils.R")
+knitr::opts_chunk$set(dev = c("png","pdf"))
+```
+
+# Read data sets
+
+Load pre-processed kinobead table table
+```{r}
+tarList <- readRDS("../output/allTargets.rds")
+```
+
+Read in BeatAML raw drug screen datasets
+```{r warning=FALSE}
+
+# BeatAML screening data
+beatAML <- read.delim("../data/BeatAML/OHSU_BeatAMLWaves1_2_Tyner_DrugResponse.txt", header = TRUE, sep = "\t", dec = ".")
+
+# clinical data annotation
+beatAMLannot <- read.delim("../data/BeatAML/OHSU_BeatAMLWaves1_2_Tyner_ClinicalSummary.txt", 
+                           header = TRUE, sep = "\t", dec = ".",na.strings=c(""," ","NA"))
+
+# RNA Seq raw counts
+BeatAMLcounts <- read_csv("../data/BeatAML/BeatAML_RNASeq_rawcounts_2018_10_24.csv.gz")
+```
+
+# Preprocess datasets
+
+
+## Preprocess BeatAML drug screen
+Process drug names of BeatAML table
+```{r}
+beatAML <- mutate(beatAML, inhibitor = tolower(inhibitor)) %>%
+  mutate(inhibitor = gsub("[- ]","", inhibitor))
+beatAML <- separate(data = beatAML, col = inhibitor, into = c("inhibitor", "synonym"), sep = "\\(") %>% mutate(synonym = gsub("\\)", "", synonym)) 
+```
+
+
+## Find overlapping drugs between datasets
+
+Find overlapped drugs by drug names
+```{r}
+overDrug_AML_name <- intersect(tarList$Drug, beatAML$inhibitor)
+```
+
+## Calculate Hamming distance between drug names and consider synonyms to find more overlapping drugs
+
+Filter AML for not found
+```{r}
+missDrug <- setdiff(unique(beatAML$inhibitor), overDrug_AML_name)
+notFoundAML <- filter(beatAML, inhibitor %in% missDrug)
+```
+
+Filter targetlist for not found
+```{r}
+missTarget <- setdiff(unique(tarList$Drug),overDrug_AML_name)
+notFoundTarget <- filter(tarList, Drug %in% missTarget)
+```
+
+Modify the name in target table after manual inspection of synonyms
+```{r}
+tarList <- mutate(tarList, Drug = ifelse(Drug=="ruboxistaurin", "ly333531", Drug))
+tarList <- mutate(tarList, Drug = ifelse(Drug=="bms387032", "sns032", Drug))
+```
+
+Get the final overlapped drug list
+```{r}
+finalList <- intersect(tarList$Drug,beatAML$inhibitor)
+```
+
+Rename drug column in BeatAML
+```{r}
+beatAML <- dplyr::rename(beatAML, Drug = inhibitor)
+beatAML_druglist <- filter(beatAML, !is.na(`Drug`),  !duplicated(Drug))
+```
+
+
+## Match drug IDs and create drug-target affinity matrix
+
+Combine the lists
+```{r}
+targets <- left_join(tarList, beatAML_druglist, by = "Drug") %>% dplyr::select(Drug, `Target Classification`, EC50,`Apparent Kd`, `Gene Name`) %>% filter(!is.na(Drug)) %>% filter(Drug %in% finalList) 
+```
+
+How many drugs?
+```{r}
+length(unique(targets$Drug))
+```
+
+## Remove targets that are not expressed in patients
+Get count values from RNAseq
+```{r}
+BeatAML_expr <- dplyr::select(BeatAMLcounts, -c(Gene, Chr, Exon_Start, Exon_End, Strand, Length, GeneStart, GeneEnd)) 
+
+# remove duplicates
+BeatAML_expr <- BeatAML_expr[!duplicated(BeatAML_expr$Symbol),] %>% column_to_rownames("Symbol")
+BeatAML_expr <- data.matrix(BeatAML_expr) 
+
+#create DeSeq Dataset
+coldata <- beatAMLannot %>% filter(LabId %in% colnames(BeatAML_expr)) 
+BeatAML_expr <- BeatAML_expr[, colnames(BeatAML_expr) %in% beatAMLannot$LabId]
+BeatAML_expr <- BeatAML_expr[,order(colnames(BeatAML_expr))]
+coldata <- coldata %>% column_to_rownames("LabId")
+coldata <- coldata[order(rownames(coldata)),]
+dds <- DESeqDataSetFromMatrix(countData = BeatAML_expr,
+                                 colData = coldata,
+                                 design = ~ 1)
+
+#estimate size factors
+dds <- estimateSizeFactors(dds)
+
+#targets that are not in RNAseq dataset
+setdiff(unique(targets$`Gene Name`), rownames(dds))
+
+#actually two genes have different gene names used.
+symbolMap <- c("BRD4;BRD3" ="BRD3", ZAK = "MAP3K20", "CSNK2A1;CSNK2A3" = "CSNK2A1", "PDPK1;PDPK2P" = "PDPK1", "BRD4;BRD3" = "BRD3", "FAM58A;FAM58BP" = "FAM58A", "MOB1A;MOB1B" = "MOB1A", "PRKX;PRKY" = "PRKX", "DDT;DDTL" = "DDT" )
+targets <- mutate(targets, `Gene Name` = ifelse(`Gene Name` %in% names(symbolMap),
+                                  symbolMap[`Gene Name`],
+                                  `Gene Name`))
+
+#get count data
+targetCount <- dds[rownames(dds)  %in% targets$`Gene Name`,colnames(dds) %in% beatAMLannot$LabId]
+
+#check again
+setdiff(unique(targets$`Gene Name`), rownames(targetCount)) #some genes are indeed not in RNAseq dataset
+```
+
+Plot the expression values
+```{r, fig.width=10, fig.height=6}
+#prepare plot tab
+plotTab <- data.frame(counts(targetCount, normalized = FALSE)) %>% 
+  rownames_to_column("ID") %>%
+  mutate(symbol = rownames(targetCount)) %>%
+  gather(key = "patID", value = "counts", -symbol, -ID)
+
+#deal with one gene, multiple transcript problem
+#only keep the most aboundant transcript
+transTab <- group_by(plotTab, ID, symbol) %>% summarize(total = sum(counts)) %>%
+  ungroup() %>%
+  arrange(desc(total)) %>% distinct(symbol, .keep_all = TRUE)
+plotTab <- filter(plotTab, ID %in% transTab$ID)
+
+
+#get the 80% quantile expression value
+exprMed <- group_by(plotTab, symbol) %>% summarise(avgCount = quantile(counts,0.8)) %>%
+   arrange(avgCount) %>% top_n(-50, avgCount)
+
+#only plot the 50 lowest expressed genes
+plotTab <- filter(plotTab, symbol %in% exprMed$symbol) %>%
+  mutate(symbol = factor(symbol, levels = exprMed$symbol))
+
+ggplot(plotTab, aes(x= symbol, y = counts)) + geom_boxplot() +
+  theme_bw() + theme(axis.text.x = element_text(angle = 90, hjust =1, vjust =.5))  + ylim(0, 5000)
+```
+
+Removed the targets that are not expressed in AML samples
+```{r}
+#80% quantile < 10
+geneRemove <- filter(exprMed, rank(avgCount) / n() < 0.8)
+geneRemove <- filter(exprMed,avgCount < 10)$symbol
+targets <- filter(targets, !`Gene Name` %in% geneRemove)
+```
+
+Change column names
+```{r}
+colnames(targets) <- c("drugName", "targetClassification","EC50","Kd","targetName")
+```
+
+Turn target table into drug-target affinity matrix
+```{r}
+tarMat_kd <- dplyr::filter(targets, targetClassification == "High confidence") %>% 
+    dplyr::select(drugName, targetName, Kd) %>% 
+    spread(key = "targetName", value = "Kd") %>%
+    remove_rownames() %>% column_to_rownames("drugName") %>% as.matrix()
+```
+
+As a pre-processing of the drug-protein affinity matrix with kd values (or optionally other affinity measurement values at roughly normal distribution) we chose to perform the following steps:
+
+- log-transform kd values (ifKd = TRUE)
+- arctan-transform log(kd) values (ifKd = TRUE)
+- check target similarity and remove highly correlated targets (ifCorFeat = TRUE)
+
+```{r}
+ProcessTargetResults <- processTarget(tarMat_kd, ifKd = TRUE , ifCorFeat = TRUE)
+```
+
+
+```{r tarNet_beatAML, fig.height=7, fig.width=7}
+load("../output/BeatAML_result.RData")
+CancerxTargets<- rowSums(result$freqMat)
+CancerxTargets <- names(CancerxTargets[CancerxTargets>0])
+plotTarGroups(ProcessTargetResults, CancerxTargets)
+
+```
+
+# Prepare response matrix (drug X sample)
+
+## Prepare response matrix using the AUC
+
+The z-score was chosen as a suitable measurement value for our drug screening response matrix as it corresponds to a normalization for each drug over all cell lines. When working with AUC or IC50 values, a suitable normalization of the values is recommended.
+
+```{r}
+BeatAML_viab <- filter(beatAML, Drug %in% targets$drugName) %>%
+  dplyr::select(Drug, lab_id , ic50, auc)
+# filter out multiple samples per patient
+beatAMLannot <- beatAMLannot[!duplicated(beatAMLannot$PatientId), ]
+BeatAML_viab_subs <- subset(BeatAML_viab, rownames(BeatAML_viab) %in% rownames(beatAMLannot))
+
+#create matrix
+BeatAML_matrix <- BeatAML_viab %>% dplyr::select(Drug, lab_id, auc) %>% 
+  tidyr::spread(key = lab_id, value = auc) %>%
+  remove_rownames() %>% column_to_rownames("Drug") %>%
+  as.matrix()
+```
+
+
+## Assessment of missing values and remaining samples
+```{r}
+missTab <- data.frame(NA_cutoff = character(0), remain_Samples = character(0), stringsAsFactors = FALSE)
+      
+for (i in 0 : 138) {
+  a <- dim(BeatAML_matrix[,colSums(is.na(BeatAML_matrix)) <= i])[2]
+  missTab [i,] <- c(i, a)
+}
+#missTab
+plot(missTab, type = "l")
+```
+
+From looking at the missing value distribution, we choose cell lines with a maximum of 15 missing values per cell line (= 24%) as usable for the MissForest imputation method.
+
+## Subset for only complete cell lines --> Use cell lines with less than 15 missing values (based on assessment above)
+```{r}
+BeatAML_mat_subset <- BeatAML_matrix[,colSums(is.na(BeatAML_matrix)) <= 15]
+```
+
+## MissForest imputation
+```{r}
+impRes <- missForest(t(BeatAML_mat_subset))
+imp_missforest <- impRes$ximp
+
+BeatAML_mat_forest <- t(imp_missforest)
+colnames(BeatAML_mat_forest) <- colnames(BeatAML_mat_subset)
+rownames(BeatAML_mat_forest) <- rownames(BeatAML_mat_subset)
+```
+
+
+## Calculate column-wise z-score
+```{r}
+#using column-wise Z-score, because we focus more on the effect of different drugs on the same patient sample.
+BeatAML_mat_forest.scale <- t(mscale(t(BeatAML_mat_forest)))
+```
+
+# Prepare sample annotation
+
+## Annotation table with samples and percentage of missing values
+```{r}
+annoTab_missval <- data.frame(sample = character(0), missing_value_perc= numeric(0), stringsAsFactors = FALSE)
+missinglist <- colSums(is.na(BeatAML_mat_subset))
+for (i in 1 : length(BeatAML_mat_forest[1,])) {
+  a <- round((missinglist[i] / length(BeatAML_mat_forest[,1]))*100, 1)
+  annoTab_missval [i,] <- c(colnames(BeatAML_mat_subset)[i], a)
+}
+annoTab_missval$missing_value_perc <- as.numeric(annoTab_missval$missing_value_perc)
+annoTab_missval <- annoTab_missval %>% mutate(sample = gsub("[- ]",".",sample)) 
+
+annoTab_missval <- annoTab_missval %>%
+  data.frame() %>% remove_rownames() %>%
+  column_to_rownames("sample") 
+```
+
+
+## Sample annotation table
+```{r}
+sample_annot <- dplyr::select(beatAMLannot,1:2, 88:159) %>% distinct(LabId, .keep_all = TRUE) %>% mutate_if(is.factor, as.character)  %>% column_to_rownames("LabId") 
+rownames(sample_annot) <- gsub("-",".",rownames(sample_annot))
+rownames(sample_annot) <- gsub(" ",".",rownames(sample_annot))
+
+sample_annot[sample_annot!="negative"] <- "positive"
+
+sample_annot <- sample_annot[, colSums(sample_annot == "positive", na.rm=TRUE) > 3]
+
+sample_annotation <- merge(annoTab_missval, sample_annot, all.x=T, by='row.names') %>% column_to_rownames("Row.names")
+sample_annotation$SF3B1 <- sample_annotation$SF3B1 %>% replace_na("negative")
+sample_annotation$KMT2A <- sample_annotation$KMT2A %>% replace_na("negative")
+sample_annotation$BCOR <- sample_annotation$BCOR %>% replace_na("negative")
+sample_annotation$ASXL1 <- sample_annotation$ASXL1 %>% replace_na("negative")
+
+# Annotation with BTK cluster status from Paper
+Ibrutinib_sensitive <- c("15.00269","15.00383","16.00102","15.00482","16.00831","15.00556","15.00593","15.00417","16.00120","16.00078","15.00680","16.01017", "16.00027","15.00237","15.00872","15.00909","16.00292","15.00755","16.00094","14.00613","16.00770","16.00356","16.00498","12.00051","16.00278","15.00276","15.00633","15.00650","15.00766","13.00149","15.00807","16.00220","13.00195","16.00271","15.00883","16.00867","16.01216","16.00465","15.00701","15.00043","14.00041","14.00559","13.00552","16.01185")
+
+sample_annotation$Ibrutinib_sensitive <- c(NA)
+
+sample_annotation$Ibrutinib_sensitive[rownames(sample_annotation) %in% Ibrutinib_sensitive] <- 1
+sample_annotation$Ibrutinib_sensitive[is.na(sample_annotation$Ibrutinib_sensitive)] <- 0
+
+sample_annotation[, -1] <- lapply(sample_annotation[, -1], as.factor)
+```
+
+# Save pre-processed dataset
+
+```{r}
+ProcessTargetResults_BeatAML <- ProcessTargetResults
+tarMat_BeatAML <- ProcessTargetResults$resTarMat
+viabMat_BeatAML <- BeatAML_mat_forest.scale[rownames(tarMat_BeatAML),]
+annotation_beatAML <- sample_annotation
+save(tarMat_BeatAML, viabMat_BeatAML, annotation_beatAML, ProcessTargetResults_BeatAML, file = "../output/inputs_BeatAML.RData")
+```
+

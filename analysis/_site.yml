@@ -1,0 +1,13 @@
+name: "DepInfeR workflow"
+output_dir: ../docs
+navbar:
+  title: "DepInfeR"
+  left:
+  - text: Home
+    href: index.html
+output:
+  workflowr::wflow_html:
+    toc: yes
+    toc_float: yes
+    theme: cosmo
+    highlight: textmate

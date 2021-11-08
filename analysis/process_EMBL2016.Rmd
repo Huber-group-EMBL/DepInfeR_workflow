@@ -1,0 +1,262 @@
+---
+title: "Pre-processing EMBL2016 drug screen datasets"
+author: "Junyan Lu"
+date: "2021-10-05"
+output: workflowr::wflow_html
+editor_options:
+  chunk_output_type: inline
+---
+
+# Introduction
+
+This document shows the preprocessing of the EMBL2016 screening dataset to use with the target importance inference package (DepInfeR) with the kinobeads kinase inhibitor screen (Klaeger, 2017).
+
+***
+
+# Load packages
+
+Packages
+```{r message=FALSE, warning=FALSE}
+library(depInfeR)
+library(stringdist)
+library(BloodCancerMultiOmics2017)
+library(DESeq2)
+library(igraph)
+library(tidyverse)
+source("../code/utils.R")
+knitr::opts_chunk$set(dev = c("png","pdf"))
+```
+
+# Read data sets
+
+Load pre-processed kinobead table table
+```{r}
+tarList <- readRDS("../output/allTargets.rds")
+```
+
+Read in EMBL2016 raw drug screen datasets
+```{r warning=FALSE}
+EMBLscreen <- readxl::read_xlsx("../data/EMBL2016/EMBL2016_screen.xlsx")
+
+#sample annotation
+patMeta <- readxl::read_xlsx("../data/EMBL2016/EMBL2016_patAnnotation.xlsx")
+```
+
+# Preprocess datasets
+
+## Find overlapping drugs between drug screen data and drug-target dataset
+
+Get drug list from EMBL2016 screen 
+```{r}
+drugList <- EMBLscreen %>% dplyr::select(drugID, name, Synonyms) %>%
+  filter(!is.na(drugID), !duplicated(drugID)) %>% mutate(Drug = tolower(name)) %>%
+  mutate(Drug = gsub("[- ]","",Drug)) 
+```
+
+
+Find overlapped drugs by their names
+```{r}
+overDrug <- intersect(tarList$Drug, drugList$Drug)
+```
+
+Drugs that are not overlapped. 
+```{r}
+missDrug <- setdiff(drugList$Drug, tarList$Drug)
+```
+
+
+Calculate hamming distance and consider synonyms
+```{r}
+notFound <- setdiff(unique(tarList$Drug),overDrug)
+stillNotFound <- filter(drugList, Drug %in% missDrug)
+
+distTab <- lapply(seq(nrow(stillNotFound)), function(i) {
+  drug1 <- stillNotFound[i,]$Drug
+  synList <- strsplit(stillNotFound[i,]$Synonyms, split = ",")[[1]]
+  lapply(synList, function(syn) {
+    lapply(notFound, function(drug2) {
+      data.frame(drug1 = drug1, synonym = tolower(syn), drug2= drug2, dis = stringdist(tolower(syn), drug2), stringsAsFactors = FALSE)
+    }) %>% dplyr::bind_rows()
+  }) %>% dplyr::bind_rows()
+}) %>% dplyr::bind_rows()
+
+distTab <- arrange(distTab, dis)
+head(distTab, n=10)
+```
+The first 8 drugs are the same drugs
+
+Get drug mappings
+```{r}
+drugMap <- distTab[1:8,]$drug1
+names(drugMap) <- distTab[1:8,]$drug2
+```
+
+Modify the name
+```{r}
+tarList <- mutate(tarList, Drug = ifelse(Drug %in% names(drugMap), drugMap[Drug],Drug))
+```
+
+
+Get the final overlapped drug list
+```{r}
+finalList <- intersect(tarList$Drug, drugList$Drug)
+```
+
+
+Combine the lists and match drug IDs
+```{r}
+targets <- left_join(tarList, drugList, by = "Drug") %>% 
+  dplyr::select(name, drugID, `Target Classification`, EC50,`Apparent Kd`, `Gene Name`) %>%
+  dplyr::filter(!is.na(name))
+```
+
+How many drugs?
+```{r}
+length(unique(targets$drugID))
+```
+
+Change names
+```{r}
+colnames(targets) <- c("drugName","drugID","targetClassification","EC50","Kd","targetName","originalTarget","originalPathway")
+```
+
+
+## Remove targets that are not expressed in patient samples at all
+
+Based on published RNAseq dataset
+```{r}
+data("dds")
+dds <- dds[,dds$PatID %in% EMBLscreen$patID]
+colnames(dds) <- dds$PatID
+```
+
+Get count values from RNAseq data
+```{r}
+#targets that are not in RNAseq dataset
+#setdiff(unique(targets$targetName), rowData(dds)$symbol)
+
+#actually four genes have different gene names used.
+symbolMap <- c(ADCK3 ="COQ8A", ZAK = "MAP3K20",
+               KIAA0195 = "TMEM94", ADRBK1 = "GRK2")
+
+#correct the name
+targets <- mutate(targets, targetName = ifelse(targetName %in% names(symbolMap),
+                                  symbolMap[targetName],
+                                  targetName))
+highTargets <- filter(targets, targetClassification == "High confidence")
+
+#get count data
+targetCount <- dds[rowData(dds)$symbol %in% targets$targetName,]
+```
+
+Plot the expression values
+```{r, fig.width=10, fig.height=6}
+#prepare plot tab
+plotTab <- data.frame(counts(targetCount, normalized = FALSE)) %>% 
+  rownames_to_column("ID") %>%
+  mutate(symbol = rowData(targetCount)$symbol) %>%
+  gather(key = "patID", value = "counts", -symbol, -ID)
+
+#deal with one gene, multiple transcript problem
+#only keep the most aboundant transcript
+transTab <- group_by(plotTab, ID, symbol) %>% summarize(total = sum(counts)) %>%
+  ungroup() %>%
+  arrange(desc(total)) %>% distinct(symbol, .keep_all = TRUE)
+plotTab <- filter(plotTab, ID %in% transTab$ID)
+
+
+#get the 80% quantile expression value
+exprMed <- group_by(plotTab, symbol) %>% summarise(avgCount = quantile(counts,0.8)) %>%
+   arrange(avgCount) %>% top_n(-50, avgCount)
+
+#only plot the 50 lowest expressed genes
+plotTab <- filter(plotTab, symbol %in% exprMed$symbol) %>%
+  mutate(symbol = factor(symbol, levels = exprMed$symbol))
+
+ggplot(plotTab, aes(x= symbol, y = counts)) + geom_boxplot() +
+  theme_bw() + theme(axis.text.x = element_text(angle = 90, hjust =1, vjust =.5)) 
+```
+
+Removed the targets that are not expressed 
+```{r}
+#80% quantile < 10
+geneRemove <- filter(exprMed, rank(avgCount) / n() < 0.8)
+geneRemove <- filter(exprMed,avgCount < 10)$symbol
+targets <- filter(targets, !targetName %in% geneRemove)
+```
+
+
+Turn target table into drug-target affinity matrix
+```{r}
+tarMat_kd <- dplyr::filter(targets, targetClassification == "High confidence") %>% 
+    dplyr::select(drugID, targetName, Kd) %>% 
+    spread(key = "targetName", value = "Kd") %>%
+    remove_rownames() %>% column_to_rownames("drugID") %>% as.matrix()
+```
+
+## Re-scale Kd values and collapse highly correlated drugs
+Apply drug-target preprocessing function
+```{r}
+ProcessTargetResults <- processTarget(tarMat_kd, ifKd = TRUE , ifCorFeat = TRUE, keepTargets = c("BTK","LYN","SRC","SYK", "WEE1"))
+```
+
+## Plot target groups
+```{r targetNet_EMBL2016, fig.height=4, fig.width=4}
+#plot network
+#Only plot for finnally selected targets
+
+load("../output/EMBL_result.RData")
+CancerxTargets<- rowSums(result$freqMat)
+CancerxTargets <- names(CancerxTargets[CancerxTargets>0])
+plotTarGroups(ProcessTargetResults, CancerxTargets)
+```
+
+## Visualization of the whole drug-target network
+```{r drugTargetNet_EMBL, fig.height=20 , fig.width=20}
+plotTab <- dplyr::select(targets, drugName, targetName)
+nodeAttr <- gather(plotTab, key = "type", value = "name", drugName, targetName) %>%
+  filter(!duplicated(name)) %>%
+  mutate(type = ifelse(type == "targetName", "target", "drug"))
+
+g <- graph_from_edgelist(as.matrix(plotTab))
+
+V(g)$nodeType <- nodeAttr[match(V(g)$name, nodeAttr$name),]$type
+V(g)$shape <- ifelse(V(g)$nodeType == "drug", "circle","square")
+V(g)$color <- ifelse(V(g)$nodeType == "drug", "skyblue","pink")
+V(g)$size = 6
+V(g)$label.cex = 0.7
+plot(g, layout=layout_with_kk)
+```
+No obvious structure can be seen. Polypharmacology needs to be resolved.
+
+## Preparation of drug response matrix
+
+### Prepare response matrix using the z-score 
+
+In order to be consistent for all drugs, only the 9 lowest concentrations are regarded.
+
+**Use average of 9 concentrations**
+```{r}
+viabTab <- dplyr::filter(EMBLscreen,
+                  concIndex %in% seq(1,9)) %>% 
+  group_by(drugID, patID) %>% 
+  summarise(viab = mean(normVal.sigm)) %>% ungroup() %>%
+  dplyr::rename(Drug = drugID, patientID = patID)
+
+viabMat <- spread(viabTab, patientID, viab) %>%
+  data.frame() %>%
+  column_to_rownames("Drug") %>% as.matrix()
+```
+
+
+# Save pre-processed dataset
+
+```{r}
+targetsEMBL <- targets
+ProcessTargetResults_EMBL <- ProcessTargetResults
+tarMat_EMBL <- ProcessTargetResults$resTarMat
+viabMat_EMBL <- viabMat[rownames(tarMat_EMBL),]
+annotation_EMBL <- patMeta
+save(tarMat_EMBL, viabMat_EMBL, annotation_EMBL, ProcessTargetResults_EMBL, targetsEMBL, file = "../output/inputs_EMBL.RData")
+```
+

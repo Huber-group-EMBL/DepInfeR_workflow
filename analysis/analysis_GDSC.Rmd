@@ -1,0 +1,275 @@
+---
+title: "Pre-processing GDSC drug screen datasets"
+author: "Junyan Lu"
+date: "2021-10-05"
+output: workflowr::wflow_html
+editor_options:
+  chunk_output_type: inline
+---
+
+# Load packages
+
+Packages
+```{r package, message=FALSE, warning=FALSE}
+library(depInfeR)
+library(RColorBrewer)
+library(pheatmap)
+library(ggbeeswarm)
+library(ggrepel)
+library(tidyverse)
+source("../code/utils.R")
+knitr::opts_chunk$set(dev = c("png","pdf"))
+```
+
+# Load pre-processed datasets
+```{r load gdsc}
+load("../output/inputs_GDSC.RData")
+```
+
+## Dimensions of input matrices
+
+Drug-target
+```{r}
+dim(tarMat_GDSC)
+```
+
+Drug-sample (viability matrix)
+```{r}
+dim(viabMat_GDSC)
+```
+
+# Multivariant model for protein dependence prediction
+
+Perform multivariant LASSO regression based on a drug-protein affinity matrix and a drug response matrix.  
+This chunk can take a long time to run. Therefore we will save the result for later use to save time. 
+```{r lasso gdsc, eval=FALSE}
+result <- runLASSOregression(TargetMatrix = tarMat_GDSC, ViabMatrix = viabMat_GDSC, seed = 333)
+
+#remove targets that were never selected
+useTar <- rowSums(result$coefMat) != 0
+result$coefMat <- result$coefMat[useTar,]
+
+
+#save intermediate results
+save(result, file = "../output/GDSC_result.RData")
+```
+
+Load the saved result
+```{r save gdsc}
+load("../output/GDSC_result.RData")
+```
+
+Number of selected targets
+```{r}
+nrow(result$coefMat)
+```
+
+# Heatmap plots of protein dependence matrix
+
+The protein dependence matrix can be nicely visualized in a heatmap. High positive coefficients imply strong reliance of a certain sample on this protein for survival. Proteins with coefficients close to zero are less essential for the cell’s survival. Negative coefficients indicate that the viability phenotype benefits from inhibition of the protein. 
+
+## Heatmap of protein dependence coefficients
+
+```{r GDSC_coefHeatmap, fig.height=12, fig.width=18}
+annoColor <- list(H2O2 = c(`-1` = "red", `0` = "black", `1` = "green"),
+                  IL.1 = c(`-1` = "red", `0` = "black", `1` = "green"),
+                  JAK.STAT = c(`-1` = "red", `0` = "black", `1` = "green"),
+                  MAPK.only = c(`-1` = "red", `0` = "black", `1` = "green"),
+                  MAPK.PI3K = c(`-1` = "red", `0` = "black"),
+                  TLR = c( `-1` = "red", `0` = "black", `1` = "green"),
+                  Wnt = c(`-1` = "red", `0` = "black", `1` = "green"),
+                  VEGF = c(`-1` = "red", `0` = "black", `1` = "green"),
+                  PI3K.only = c(`-1` = "red", `0` = "black", `1` = "green"),
+                  TCGA.classification = c(ALL="#BC3C29FF",LAML="#E18727FF",DLBC="#20854EFF","BRCAHer-"="#0072B5FF",'BRCAHer+'="#7876B1FF"),
+                  ARID1A_mut = c(`1` = "black",`0` = "grey80"),
+                  EP300_mut = c(`1` = "black",`0` = "grey80"),
+                  PTEN_mut = c(`1` = "black",`0` = "grey80"),
+                  TP53_mut = c(`1` = "black",`0` = "grey80"),
+                  PIK3CA_mut = c(`1` = "black",`0` = "grey80"),
+                  BRCA2_mut = c(`1` = "black",`0` = "grey80"),
+                  BRCA1_mut = c(`1` = "black",`0` = "grey80"),
+                  CDH1_mut = c(`1` = "black",`0` = "grey80"),
+                  FBXW7_mut = c(`1` = "black",`0` = "grey80"),
+                  NRAS_mut = c(`1` = "black",`0` = "grey80"),
+                  ASXL1_mut = c(`1` = "black",`0` = "grey80"),
+                  MLL2_mut = c(`1` = "black",`0` = "grey80"),
+                  ABL1_trans = c(`1` = "black",`0` = "grey80"),
+                  missing_value_perc = c(`0` = "white",`25` = "red")
+)
+
+plotTab <- result$coefMat
+#Row normalization while keeping sign
+plotTab_scaled <- scale(t(plotTab), center = FALSE, scale= TRUE)
+plotTab <- t(plotTab_scaled)
+levels(mutation_GDSC$TCGA.classification) <- c(levels(mutation_GDSC$TCGA.classification), "BRCAHer-")
+mutation_GDSC$TCGA.classification[mutation_GDSC$TCGA.classification=="BRCA"] <- "BRCAHer-"
+mutation_GDSC$TCGA.classification <- factor(mutation_GDSC$TCGA.classification, levels = c("ALL", "LAML", "DLBC", "BRCAHer-", "BRCAHer+"))
+mutation_GDSC$missing_value_perc <- NULL
+
+pheatmap(plotTab, 
+         color=colorRampPalette(rev(brewer.pal(n = 7, name = "RdBu")), bias= 1.8)(100),
+         annotation_col = mutation_GDSC,
+         annotation_colors = annoColor,
+         clustering_method = "ward.D2", scale = "none", 
+         show_colnames = TRUE, main = "", fontsize = 9, fontsize_row = 10, fontsize_col = 7)
+```
+
+# Differential dependence on proteins associated with cancer types and genotypes
+
+Prepare genomic background table
+```{r gdsc genomic}
+cell_anno_final <- mutation_GDSC %>%
+  #dplyr::select(-missing_value_perc) %>% 
+  dplyr::rename(cancer_type = TCGA.classification) %>% 
+  dplyr::filter(rownames(mutation_GDSC) %in% colnames(result$coefMat))
+colnames(cell_anno_final) <- str_remove_all(colnames(cell_anno_final),"_mut")
+colnames(cell_anno_final) <- str_replace_all(colnames(cell_anno_final),"_trans","_translocation")
+```
+
+Association test between protein dependence and cancer type or mutational background
+```{r gdsc t-test}
+testRes <-  diffImportance(result$coefMat, cell_anno_final)
+```
+
+Visualize protein associations with cancer type
+```{r GDSC_diffCoef_box,fig.height=7, fig.width=16}
+CancerType <- testRes %>% dplyr::filter(mutName == "cancer_type") %>% dplyr::filter(p.adj < 0.05, FC > 0.1)
+plotTab <- t(scale(t(result$coefMat))) %>% data.frame() %>%
+  rownames_to_column("target") %>% gather(key = "CellLine", value = "coef",-target) %>% mutate(Cancer_Type = mutation_GDSC[CellLine,]$TCGA.classification) %>%
+  group_by(target, Cancer_Type) %>% mutate(meanCoef = mean(coef)) %>% arrange(meanCoef) %>% ungroup() %>%
+  mutate(target = factor(target, levels = unique(target))) 
+
+
+plotTab <- plotTab %>% dplyr::filter(target %in% CancerType$targetName)
+plotTab$Cancer_Type <- factor(plotTab$Cancer_Type, levels = c("ALL", "LAML","DLBC", "BRCAHer-", "BRCAHer+"))
+
+ggplot(plotTab, aes(x = target, y = coef, group=Cancer_Type)) +
+ geom_jitter(
+  aes(color = Cancer_Type), 
+  position = position_jitterdodge(jitter.width = 0.2, dodge.width = 0.8),
+  size = 1.2
+  ) +
+  stat_summary(
+    fun= mean, fun.min=mean, fun.max=mean, colour="grey25",
+    geom = "crossbar",  size = 0.8,
+    position = position_dodge(0.8)
+    ) +
+  scale_color_manual(values= c("#BC3C29FF","#E18727FF","#20854EFF","#0072B5FF","#7876B1FF"),
+                     guide = guide_legend(override.aes = list(size = 3) )) +
+  ggtitle("Protein dependence associated with cancer type") + ylab("Protein dependence coefficient") + xlab("Protein") + theme_bw() + 
+  theme_custom + geom_vline(xintercept =seq(from = 1.5, to = 8.5, by = 1), color="darkgrey") + labs(color = "Cancer Type")
+```
+
+Radar plot visualization  
+```{r GDSC_diffCoef_radar, fig.height=4.5, fig.width=6.5}
+starMatrix <- plotTab  %>% dplyr::select(target, Cancer_Type, meanCoef)  %>% distinct()
+starMatrix <- starMatrix %>% pivot_wider(names_from = target, values_from = meanCoef) 
+starMatrix <- starMatrix %>% mutate(Cancer_Type =  factor(Cancer_Type, levels = c("ALL", "LAML","DLBC", "BRCAHer-", "BRCAHer+"))) %>% arrange(Cancer_Type) 
+starMatrix <- starMatrix %>% column_to_rownames("Cancer_Type")
+starMatrix_norm <- (as.matrix(starMatrix) + abs(min(starMatrix)))
+zeroValue <-abs(min(starMatrix)) / max(starMatrix_norm)
+starMatrix_norm <- starMatrix_norm/ max(starMatrix_norm)
+
+
+#function for a single star plot
+starPlot <- function(dataIn, sampleName,zeroVal, color='red') {
+    stopifnot(is.matrix(dataIn) & nrow(dataIn) == 1)
+    
+    #data for outer ring
+    outer <- dataIn
+    outer[!is.na(outer)] <- 1
+    
+    #data for inner ring
+    inner <- dataIn
+    inner[!is.na(inner)] <- zeroVal
+    
+    #plotting
+    stars(outer, draw.segments = FALSE, scale=FALSE, full=TRUE, locations=c(1,1), mar = c(4,4,4,4), main=sampleName, cex=0.5) #plot the outter ring
+    stars(inner, draw.segments = FALSE, scale=FALSE, full=TRUE, locations=c(1,1), lty =2 ,add=TRUE) #plot the inner ring
+    stars(dataIn, col.stars=color, draw.segments = FALSE, scale=FALSE, full=TRUE, key.loc = c(1,1), key.labels = colnames(dataIn), location=c(1,1), add=TRUE,cex=1) #plot the actual data
+}
+
+starColor <- c("#BC3C29FF","#E18727FF","#20854EFF","#0072B5FF","#7876B1FF") #define color scheme
+
+par(mfrow=c(2,3))  #layout in 3 X 3 format
+for (i in seq(1,nrow(starMatrix_norm))) {
+  dataIn <- starMatrix_norm[i, ,drop=FALSE]
+  sampleName <- rownames(starMatrix_norm)[i]
+  starCol <- starColor[i]
+  starPlot(dataIn,sampleName,zeroValue, starCol)
+}  
+```
+
+Visualize significant associations between protein dependence and mutational background
+```{r gdsc_pval_vis, fig.height=4, fig.width=8}
+colList2 <- c(`not significant` = "grey80", mutated = "#BC3C29FF", unmutated = "#0072B5FF")
+
+pos = position_jitter(width = 0.15, seed = 10)
+
+plotTab <- testRes %>% dplyr::filter(mutName != "cancer_type") %>% mutate(type = ifelse(p.adj > 0.1, "not significant", 
+                                          ifelse(FC >0, "mutated","unmutated"))) %>%
+  mutate(varName = ifelse(type == "not significant","",targetName)) %>%
+  mutate(p.adj = ifelse(p.adj <1e-5, 1e-5,p.adj))
+
+#subset for mutation with at least one significant associations
+plotMut <- unique(filter(testRes, p.adj <= 0.1)$mutName)
+
+plotTab <- plotTab %>% dplyr::filter(mutName %in% plotMut) 
+plotTab$type <- factor(plotTab$type, levels = c("mutated", "unmutated", "not significant"))
+
+p <- ggplot(data=plotTab, aes(x= mutName, y=-log10(p.adj),
+                              col=type, label = varName))+ 
+  geom_text_repel(position = pos, color = "black", size= 6, force = 3) +
+  geom_hline(yintercept = -log10(0.1), linetype="dotted", color = "grey20") + 
+  geom_point(size=3, position = pos) + 
+  ylab(expression(-log[10]*'('*adjusted~italic("P")~value*')')) + xlab("Mutation") +
+  scale_color_manual(values = colList2) + 
+  scale_y_continuous(trans = "exp", limits = c(0,2.5), breaks = c(0,1,1.5,2)) + 
+  theme_custom +
+  #annotate(geom = "text", x = 0.5, y = -log10(0.1) - 0.25, label = "10% FDR", size=7, col = "grey20") +
+  coord_flip()  + labs(col = "Higher dependence in")  +
+  theme(legend.position = c(0.80,0.2),
+        legend.background = element_rect(fill = NA),
+        legend.text = element_text(size=14),
+        legend.title = element_text(size=16),
+        axis.title = element_text(size=18),
+        axis.text = element_text(size=18))
+plot(p)
+#ggsave("test.pdf",height = 4, width = 8)
+```
+
+
+Visualize significant associations using a heatmap
+```{r gdsc_pval_Heatmap, fig.height=4, fig.width=8}
+plotTab <- testRes %>% dplyr::filter(mutName != "cancer_type") %>% 
+  mutate(starSign = ifelse(p.adj <=0.1, "*", ""),
+         pSign = -log10(p)*sign(FC))
+
+#subset for mutation with at least one significant associations
+plotTar <- unique(filter(plotTab, p.adj <= 0.1)$targetName)
+plotMut <- unique(filter(plotTab, p.adj <= 0.1)$mutName)
+plotTab <- plotTab %>% dplyr::filter( targetName %in% plotTar , mutName %in% plotMut) 
+
+
+p <- ggplot(data=plotTab, aes(y=mutName, x = targetName, fill=pSign)) +
+  geom_tile(col = "black") + geom_text(aes(label = starSign), size=5, vjust=0.5) +
+  scale_fill_gradient2(low = "#BC3C29FF", high = "#0072B5FF", name = bquote(-log[10]*italic("P"))) +
+  theme_minimal() +
+  theme(panel.grid.major = element_blank(),
+        legend.text = element_text(size=14),
+        legend.title = element_text(size=16),
+        axis.title = element_text(size=18),
+        axis.text = element_text(size=18)) +
+  ylab("Mutations") + xlab("Proteins")
+
+p
+
+```
+
+
+Visualization of exemplary association between NRAS mutation status and MAP2K2 dependence visualized in a beeswarm plot
+```{r gdsc boxplot, fig.height=4.5, fig.width=5}
+pList <- plotDiffBox(testRes, result$coefMat, cell_anno_final, 0.05)
+pList$MAP2K2_NRAS
+```
+
