@@ -15,8 +15,8 @@
 
 <title>Pre-processing GDSC drug screen datasets</title>
 
-<script src="site_libs/header-attrs-2.9/header-attrs.js"></script>
-<script src="site_libs/jquery-1.11.3/jquery.min.js"></script>
+<script src="site_libs/header-attrs-2.11/header-attrs.js"></script>
+<script src="site_libs/jquery-3.6.0/jquery-3.6.0.min.js"></script>
 <meta name="viewport" content="width=device-width, initial-scale=1" />
 <link href="site_libs/bootstrap-3.3.5/css/cosmo.min.css" rel="stylesheet" />
 <script src="site_libs/bootstrap-3.3.5/js/bootstrap.min.js"></script>
@@ -38,7 +38,7 @@
 <link href="site_libs/highlightjs-9.12.0/textmate.css" rel="stylesheet" />
 <script src="site_libs/highlightjs-9.12.0/highlight.js"></script>
 
-<link rel="icon" href="https://github.com/workflowr/workflowr-assets/raw/master/img/reproducible.png">
+<link rel="icon" href="https://github.com/workflowr/workflowr-assets/raw/main/img/reproducible.png">
 <!-- Add a small amount of space between sections. -->
 <style type="text/css">
 div.section {
@@ -371,7 +371,7 @@ div.tocify {
 <div class="tab-content">
 <div id="summary" class="tab-pane fade in active">
 <p>
-<strong>Last updated:</strong> 2021-11-05
+<strong>Last updated:</strong> 2021-12-24
 </p>
 <p>
 <strong>Checks:</strong> <span class="glyphicon glyphicon-ok text-success" aria-hidden="true"></span> 6 <span class="glyphicon glyphicon-exclamation-sign text-danger" aria-hidden="true"></span> 1
@@ -380,8 +380,8 @@ div.tocify {
 <strong>Knit directory:</strong> <code>DepInfeR/analysis/</code> <span class="glyphicon glyphicon-question-sign" aria-hidden="true" title="This is the local directory in which the code in this file was executed."> </span>
 </p>
 <p>
-This reproducible <a href="http://rmarkdown.rstudio.com">R Markdown</a> analysis was created with <a
-  href="https://github.com/jdblischak/workflowr">workflowr</a> (version 1.6.2). The <em>Checks</em> tab describes the reproducibility checks that were applied when the results were created. The <em>Past versions</em> tab lists the development history.
+This reproducible <a href="https://rmarkdown.rstudio.com">R Markdown</a> analysis was created with <a
+  href="https://github.com/workflowr/workflowr">workflowr</a> (version 1.7.0). The <em>Checks</em> tab describes the reproducibility checks that were applied when the results were created. The <em>Past versions</em> tab lists the development history.
 </p>
 <hr>
 </div>
@@ -484,6 +484,7 @@ Ignored files:
     Ignored:    analysis/.DS_Store
     Ignored:    analysis/.Rhistory
     Ignored:    analysis/analysis_RNAseq_cache/
+    Ignored:    analysis/figure/
     Ignored:    data/.DS_Store
     Ignored:    output/.DS_Store
 
@@ -545,7 +546,7 @@ There are no past versions. Publish this analysis with <code>wflow_publish()</co
 <ul>
 <li><p>Diffuse Large B-Cell Lymphoma (DLBC)</p></li>
 <li><p>Acute lymphocytic leukemia (ALL)</p></li>
-<li><p>Acute myeloid leukemia (L-AML)</p></li>
+<li><p>Acute myeloid leukemia (AML)</p></li>
 <li><p>Breast carcinoma (BRCAHer+ / BRCAHer-)</p></li>
 </ul>
 <p>The Her2 status was annotated manually.</p>
@@ -599,7 +600,6 @@ DLBC_mut &lt;- read_csv(&quot;../data/GDSC/DLBC_genetic.csv&quot;, col_names = T
 cancerxgene_set1 &lt;- bind_rows_keep_factors(cancerxgene_ALL, cancerxgene_AML, cancerxgene_DLBC, cancerxgene_BRCA)</code></pre>
 <p>Attach synonyms to cancerxgene table</p>
 <pre class="r"><code>cancerxgene_set1$synonyms &lt;- cancerxgene_syn$Synonyms[match(cancerxgene_set1$`Drug name`, cancerxgene_syn$Name)]</code></pre>
-<pre><code>Warning: One or more parsing issues, see `problems()` for details</code></pre>
 <p>Process drug names of cancerxgene table</p>
 <pre class="r"><code>cancerxgene_set1 &lt;- mutate(cancerxgene_set1, `Drug name` = tolower(`Drug name`)) %&gt;%
   mutate(`Drug name` = gsub(&quot;[- ]&quot;,&quot;&quot;,`Drug name`))  %&gt;% mutate(`Drug name`= gsub(&quot; *\\(.*?\\) *&quot;, &quot;&quot;,`Drug name`)) </code></pre>
@@ -643,18 +643,17 @@ ggplot(testTab, aes(x=x,y=y)) + geom_point() +
 <p><img src="figure/process_GDSC.Rmd/supp_arcTrans-1.png" width="672" style="display: block; margin: auto;" /></p>
 <p>As a pre-processing of the drug-protein affinity matrix with kd values (or optionally other affinity measurement values at roughly normal distribution) we chose to perform the following steps:</p>
 <ul>
-<li>log-transform kd values (ifKd = TRUE)</li>
-<li>arctan-transform log(kd) values (ifKd = TRUE)</li>
-<li>check target similarity and remove highly correlated targets (ifCorFeat = TRUE)</li>
+<li>log-transform kd values (KdAsInput = TRUE)</li>
+<li>arctan-transform log(kd) values (KdAsInput = TRUE)</li>
+<li>check target similarity and remove highly correlated targets (removeCorrelated = TRUE)</li>
 </ul>
-<pre class="r"><code>ProcessTargetResults &lt;- processTarget(tarMat_kd, ifKd = TRUE , ifCorFeat = TRUE)</code></pre>
+<pre class="r"><code>ProcessTargetResults &lt;- processTarget(tarMat_kd, KdAsInput  = TRUE , removeCorrelated  = TRUE)</code></pre>
 </div>
 <div id="visualize-target-groups-of-highly-correlated-targets-in-network-map" class="section level2">
 <h2>Visualize target groups of highly correlated targets in network map</h2>
 <pre class="r"><code>load(&quot;../output/GDSC_result.RData&quot;)
 CancerxTargets&lt;- rowSums(result$freqMat)
 CancerxTargets &lt;- names(CancerxTargets[CancerxTargets&gt;0])
-plotTarGroups(ProcessTargetResults, CancerxTargets)
 
 #plot network
 plotTarGroups(ProcessTargetResults, CancerxTargets)</code></pre>
@@ -714,15 +713,17 @@ rownames(sanger_mat_forest) &lt;- rownames(sanger_mat_forest)</code></pre>
 <div id="read-cell-line-annotations" class="section level1">
 <h1>Read cell line annotations</h1>
 <pre class="r"><code>mutation_GDSC &lt;- readxl::read_xlsx(&quot;../data/GDSC/mutation_GDSC.xlsx&quot;) %&gt;%
+  mutate(TCGA.classification = str_replace(TCGA.classification, &quot;LAML&quot;,&quot;AML&quot;)) %&gt;%
   data.frame() %&gt;%
-  column_to_rownames(&quot;cellLine&quot;)</code></pre>
+  column_to_rownames(&quot;cellLine&quot;) </code></pre>
 </div>
 <div id="save-pre-processed-dataset" class="section level1">
 <h1>Save pre-processed dataset</h1>
 <pre class="r"><code>ProcessTargetResults_GDSC &lt;- ProcessTargetResults
-tarMat_GDSC &lt;- ProcessTargetResults$resTarMat
+tarMat_GDSC &lt;- ProcessTargetResults$targetMatrix
 viabMat_GDSC &lt;- sanger_mat_forest.scale[rownames(tarMat_GDSC),]
-save(tarMat_GDSC, viabMat_GDSC, ProcessTargetResults_GDSC, file = &quot;../output/inputs_GDSC.RData&quot;)</code></pre>
+save(tarMat_GDSC, viabMat_GDSC, ProcessTargetResults_GDSC, mutation_GDSC,
+     file = &quot;../output/inputs_GDSC.RData&quot;)</code></pre>
 <br>
 <p>
 <button type="button" class="btn btn-default btn-workflowr btn-workflowr-sessioninfo" data-toggle="collapse" data-target="#workflowr-sessioninfo" style="display: block;">
@@ -731,13 +732,13 @@ save(tarMat_GDSC, viabMat_GDSC, ProcessTargetResults_GDSC, file = &quot;../outpu
 </p>
 <div id="workflowr-sessioninfo" class="collapse">
 <pre class="r"><code>sessionInfo()</code></pre>
-<pre><code>R version 4.0.2 (2020-06-22)
+<pre><code>R version 4.1.2 (2021-11-01)
 Platform: x86_64-apple-darwin17.0 (64-bit)
-Running under: macOS  10.16
+Running under: macOS Big Sur 10.16
 
 Matrix products: default
-BLAS:   /Library/Frameworks/R.framework/Versions/4.0/Resources/lib/libRblas.dylib
-LAPACK: /Library/Frameworks/R.framework/Versions/4.0/Resources/lib/libRlapack.dylib
+BLAS:   /Library/Frameworks/R.framework/Versions/4.1/Resources/lib/libRblas.0.dylib
+LAPACK: /Library/Frameworks/R.framework/Versions/4.1/Resources/lib/libRlapack.dylib
 
 locale:
 [1] en_US.UTF-8/en_US.UTF-8/en_US.UTF-8/C/en_US.UTF-8/en_US.UTF-8
@@ -747,56 +748,57 @@ attached base packages:
 
 other attached packages:
  [1] forcats_0.5.1       stringr_1.4.0       dplyr_1.0.7        
- [4] purrr_0.3.4         readr_2.0.0         tidyr_1.1.3        
- [7] tibble_3.1.3        ggplot2_3.3.5       tidyverse_1.3.1    
+ [4] purrr_0.3.4         readr_2.1.1         tidyr_1.1.4        
+ [7] tibble_3.1.6        ggplot2_3.3.5       tidyverse_1.3.1    
 [10] missForest_1.4      itertools_0.1-3     iterators_1.0.13   
 [13] foreach_1.5.1       randomForest_4.6-14 depInfeR_0.1.0     
 
 loaded via a namespace (and not attached):
   [1] colorspace_2.0-2    ellipsis_0.3.2      rprojroot_2.0.2    
-  [4] htmlTable_2.2.1     corpcor_1.6.9       base64enc_0.1-3    
-  [7] fs_1.5.0            rstudioapi_0.13     lavaan_0.6-9       
+  [4] htmlTable_2.3.0     corpcor_1.6.10      base64enc_0.1-3    
+  [7] fs_1.5.2            rstudioapi_0.13     lavaan_0.6-9       
  [10] farver_2.1.0        bit64_4.0.5         fansi_0.5.0        
- [13] lubridate_1.7.10    xml2_1.3.2          codetools_0.2-18   
- [16] splines_4.0.2       mnormt_2.0.2        doParallel_1.0.16  
- [19] knitr_1.33          glasso_1.11         rlist_0.4.6.1      
- [22] Formula_1.2-4       jsonlite_1.7.2      workflowr_1.6.2    
- [25] broom_0.7.9         cluster_2.1.2       dbplyr_2.1.1       
- [28] png_0.1-7           compiler_4.0.2      httr_1.4.2         
- [31] backports_1.2.1     assertthat_0.2.1    Matrix_1.3-4       
- [34] cli_3.0.1           later_1.2.0         htmltools_0.5.1.1  
- [37] tools_4.0.2         igraph_1.2.6        gtable_0.3.0       
- [40] glue_1.4.2          reshape2_1.4.4      Rcpp_1.0.7         
- [43] cellranger_1.1.0    jquerylib_0.1.4     vctrs_0.3.8        
- [46] nlme_3.1-152        psych_2.1.6         xfun_0.24          
- [49] rvest_1.0.1         lifecycle_1.0.0     gtools_3.9.2       
- [52] scales_1.1.1        vroom_1.5.3         hms_1.1.0          
- [55] promises_1.2.0.1    parallel_4.0.2      RColorBrewer_1.1-2 
- [58] yaml_2.2.1          pbapply_1.4-3       gridExtra_2.3      
- [61] sass_0.4.0          rpart_4.1-15        latticeExtra_0.6-29
- [64] stringi_1.7.3       highr_0.9           checkmate_2.0.0    
- [67] shape_1.4.6         rlang_0.4.11        pkgconfig_2.0.3    
- [70] matrixStats_0.60.0  evaluate_0.14       lattice_0.20-44    
- [73] htmlwidgets_1.5.3   labeling_0.4.2      bit_4.0.4          
- [76] tidyselect_1.1.1    ggsci_2.9           plyr_1.8.6         
- [79] magrittr_2.0.1      R6_2.5.0            generics_0.1.0     
- [82] Hmisc_4.5-0         DBI_1.1.1           pillar_1.6.2       
- [85] haven_2.4.1         foreign_0.8-81      withr_2.4.2        
- [88] abind_1.4-5         survival_3.2-11     nnet_7.3-16        
- [91] modelr_0.1.8        crayon_1.4.1        fdrtool_1.2.16     
- [94] utf8_1.2.2          tmvnsim_1.0-2       tzdb_0.1.2         
- [97] rmarkdown_2.9       jpeg_0.1-9          grid_4.0.2         
-[100] readxl_1.3.1        qgraph_1.6.9        pbivnorm_0.6.0     
-[103] data.table_1.14.0   git2r_0.28.0        reprex_2.0.0       
-[106] digest_0.6.27       httpuv_1.6.1        stats4_4.0.2       
-[109] munsell_0.5.0       glmnet_4.1-2        bslib_0.2.5.1      </code></pre>
+ [13] lubridate_1.8.0     xml2_1.3.3          codetools_0.2-18   
+ [16] splines_4.1.2       mnormt_2.0.2        doParallel_1.0.16  
+ [19] knitr_1.36          glasso_1.11         rlist_0.4.6.2      
+ [22] Formula_1.2-4       jsonlite_1.7.2      workflowr_1.7.0    
+ [25] broom_0.7.10        cluster_2.1.2       dbplyr_2.1.1       
+ [28] png_0.1-7           compiler_4.1.2      httr_1.4.2         
+ [31] backports_1.4.1     assertthat_0.2.1    Matrix_1.4-0       
+ [34] fastmap_1.1.0       cli_3.1.0           later_1.3.0        
+ [37] htmltools_0.5.2     tools_4.1.2         igraph_1.2.10      
+ [40] gtable_0.3.0        glue_1.5.1          reshape2_1.4.4     
+ [43] Rcpp_1.0.7          cellranger_1.1.0    jquerylib_0.1.4    
+ [46] vctrs_0.3.8         nlme_3.1-153        psych_2.1.9        
+ [49] xfun_0.29           rvest_1.0.2         lifecycle_1.0.1    
+ [52] gtools_3.9.2        scales_1.1.1        vroom_1.5.7        
+ [55] hms_1.1.1           promises_1.2.0.1    parallel_4.1.2     
+ [58] RColorBrewer_1.1-2  yaml_2.2.1          pbapply_1.5-0      
+ [61] gridExtra_2.3       sass_0.4.0          rpart_4.1-15       
+ [64] latticeExtra_0.6-29 stringi_1.7.6       highr_0.9          
+ [67] checkmate_2.0.0     shape_1.4.6         rlang_0.4.12       
+ [70] pkgconfig_2.0.3     matrixStats_0.61.0  evaluate_0.14      
+ [73] lattice_0.20-45     htmlwidgets_1.5.4   labeling_0.4.2     
+ [76] bit_4.0.4           tidyselect_1.1.1    ggsci_2.9          
+ [79] plyr_1.8.6          magrittr_2.0.1      R6_2.5.1           
+ [82] generics_0.1.1      Hmisc_4.6-0         DBI_1.1.1          
+ [85] pillar_1.6.4        haven_2.4.3         foreign_0.8-81     
+ [88] withr_2.4.3         abind_1.4-5         survival_3.2-13    
+ [91] nnet_7.3-16         modelr_0.1.8        crayon_1.4.2       
+ [94] fdrtool_1.2.17      utf8_1.2.2          tmvnsim_1.0-2      
+ [97] tzdb_0.2.0          rmarkdown_2.11      jpeg_0.1-9         
+[100] grid_4.1.2          readxl_1.3.1        qgraph_1.9         
+[103] pbivnorm_0.6.0      data.table_1.14.2   git2r_0.29.0       
+[106] reprex_2.0.1        digest_0.6.29       httpuv_1.6.4       
+[109] stats4_4.1.2        munsell_0.5.0       glmnet_4.1-3       
+[112] bslib_0.3.1        </code></pre>
 </div>
 </div>
 
 
 <!-- Adjust MathJax settings so that all math formulae are shown using
 TeX fonts only; see
-http://docs.mathjax.org/en/latest/configuration.html.  This will make
+https://docs.mathjax.org/en/latest/web/configuration.html. This will make
 the presentation more consistent at the cost of the webpage sometimes
 taking slightly longer to load. Note that this only works because the
 footer is added to webpages before the MathJax javascript. -->

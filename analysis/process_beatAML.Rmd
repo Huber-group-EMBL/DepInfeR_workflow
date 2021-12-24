@@ -200,12 +200,12 @@ tarMat_kd <- dplyr::filter(targets, targetClassification == "High confidence") %
 
 As a pre-processing of the drug-protein affinity matrix with kd values (or optionally other affinity measurement values at roughly normal distribution) we chose to perform the following steps:
 
-- log-transform kd values (ifKd = TRUE)
-- arctan-transform log(kd) values (ifKd = TRUE)
-- check target similarity and remove highly correlated targets (ifCorFeat = TRUE)
+- log-transform kd values (KdAsInput = TRUE)
+- arctan-transform log(kd) values (KdAsInput = TRUE)
+- check target similarity and remove highly correlated targets (removeCorrelated = TRUE)
 
 ```{r}
-ProcessTargetResults <- processTarget(tarMat_kd, ifKd = TRUE , ifCorFeat = TRUE)
+ProcessTargetResults <- processTarget(tarMat_kd, KdAsInput = TRUE , removeCorrelated  = TRUE)
 ```
 
 
@@ -324,7 +324,7 @@ sample_annotation[, -1] <- lapply(sample_annotation[, -1], as.factor)
 
 ```{r}
 ProcessTargetResults_BeatAML <- ProcessTargetResults
-tarMat_BeatAML <- ProcessTargetResults$resTarMat
+tarMat_BeatAML <- ProcessTargetResults$targetMatrix
 viabMat_BeatAML <- BeatAML_mat_forest.scale[rownames(tarMat_BeatAML),]
 annotation_beatAML <- sample_annotation
 save(tarMat_BeatAML, viabMat_BeatAML, annotation_beatAML, ProcessTargetResults_BeatAML, file = "../output/inputs_BeatAML.RData")

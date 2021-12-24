@@ -39,7 +39,7 @@ formatNum <- function(i, limit = 0.01, digits =1, format="e") {
 # Function to visualize collapsed target networks
 plotTarGroups <- function(ProcessTargetResults, targetsOfInterest = NULL) {
 
-  mapReducedTargets <- ProcessTargetResults$mapReducedTargets
+  mapReducedTargets <- ProcessTargetResults$targetCluster
 
   TarGroups <- lapply(names(mapReducedTargets), function(sourceName) {
     if (length(mapReducedTargets[[sourceName]]) != 0) {
@@ -240,4 +240,40 @@ runCamera <- function(exprMat, design, gmtFile, id = NULL,
 
     return(list(enrichTab = res, enrichPlot = p))
   }
+}
+
+
+# Function to perform a t-test or ANOVA test given a protein dependence matrix and a metadata object
+diffImportance <- function(coefMat, Annotation) {
+  #process genetic background table
+  geneBack <- Annotation
+  geneBack <- geneBack[colnames(coefMat),]
+  keepCols <- apply(geneBack,2, function(x) length(unique(na.omit(x))) >=2 & all(table(x)>6))
+  geneBack <- geneBack[,keepCols]
+
+  pTab <- lapply(rownames(coefMat), function(targetName) {
+    lapply(colnames(geneBack), function(mutName) {
+      impVec <- coefMat[targetName, ]
+      genoVec <- geneBack[, mutName]
+      resTab <- data.frame(targetName = targetName, mutName = mutName,
+                           stringsAsFactors = FALSE)
+      if (length(unique(na.omit(genoVec))) == 2) {
+        #binary feature, usting t.test
+        res <- t.test(impVec ~ genoVec, var.equal = TRUE, na.action = na.omit)
+        resTab$p <- res$p.value
+        resTab$FC <- (res$estimate[[2]]-res$estimate[[1]])/abs(res$estimate[[1]])
+      } else if (length(unique(na.omit(genoVec))) >=3) {
+        #using anova
+        res <- anova(lm(impVec ~ genoVec, na.action = na.omit))
+        #get the group mean difference
+        diffTab <- data.frame(val = impVec, gr = genoVec) %>%
+          dplyr::filter(!is.na(gr)) %>% dplyr::group_by(gr) %>%
+          dplyr::summarise(meanVal = mean(val))
+        resTab$p = res$`Pr(>F)`[1]
+        resTab$FC = max(diffTab$meanVal)-min(diffTab$meanVal)
+      }
+      resTab
+    }) %>% dplyr::bind_rows()
+  }) %>% dplyr::bind_rows() %>% dplyr::arrange(p) %>% dplyr::mutate(p.adj = p.adjust(p, method = "BH"))
+  pTab
 }

@@ -51,7 +51,7 @@ This chunk can take a long time to run. Therefore we will save the result for la
 viabMat.scale <- t(mscale(t(viabMat_EMBL)))
 
 #run lasso regression
-result <- runLASSOregression(TargetMatrix = tarMat_EMBL , ViabMatrix = viabMat.scale, seed = 333)
+result <- runLASSOregression(TargetMatrix = tarMat_EMBL , ResponseMatrix = viabMat.scale, seed = 333)
 
 #remove targets that were never selected
 useTar <- rowSums(result$coefMat) != 0

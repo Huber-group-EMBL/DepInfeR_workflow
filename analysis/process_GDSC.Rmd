@@ -13,7 +13,7 @@ This document shows the pre-processing steps of the GDSC cancer cell line screen
 
 - Diffuse Large B-Cell Lymphoma (DLBC)
 - Acute lymphocytic leukemia (ALL)
-- Acute myeloid leukemia (L-AML)
+- Acute myeloid leukemia (AML)
 
 - Breast carcinoma (BRCAHer+ / BRCAHer-)
 
@@ -159,12 +159,12 @@ ggplot(testTab, aes(x=x,y=y)) + geom_point() +
 
 As a pre-processing of the drug-protein affinity matrix with kd values (or optionally other affinity measurement values at roughly normal distribution) we chose to perform the following steps:
 
-- log-transform kd values (ifKd = TRUE)
-- arctan-transform log(kd) values (ifKd = TRUE)
-- check target similarity and remove highly correlated targets (ifCorFeat = TRUE)
+- log-transform kd values (KdAsInput = TRUE)
+- arctan-transform log(kd) values (KdAsInput = TRUE)
+- check target similarity and remove highly correlated targets (removeCorrelated = TRUE)
 
 ```{r}
-ProcessTargetResults <- processTarget(tarMat_kd, ifKd = TRUE , ifCorFeat = TRUE)
+ProcessTargetResults <- processTarget(tarMat_kd, KdAsInput  = TRUE , removeCorrelated  = TRUE)
 ```
 
 
@@ -174,7 +174,6 @@ ProcessTargetResults <- processTarget(tarMat_kd, ifKd = TRUE , ifCorFeat = TRUE)
 load("../output/GDSC_result.RData")
 CancerxTargets<- rowSums(result$freqMat)
 CancerxTargets <- names(CancerxTargets[CancerxTargets>0])
-plotTarGroups(ProcessTargetResults, CancerxTargets)
 
 #plot network
 plotTarGroups(ProcessTargetResults, CancerxTargets)
@@ -239,8 +238,9 @@ sanger_mat_forest.scale <- t(mscale(t(sanger_mat_forest)))
 # Read cell line annotations
 ```{r}
 mutation_GDSC <- readxl::read_xlsx("../data/GDSC/mutation_GDSC.xlsx") %>%
+  mutate(TCGA.classification = str_replace(TCGA.classification, "LAML","AML")) %>%
   data.frame() %>%
-  column_to_rownames("cellLine")
+  column_to_rownames("cellLine") 
 
 ```
 
@@ -248,8 +248,9 @@ mutation_GDSC <- readxl::read_xlsx("../data/GDSC/mutation_GDSC.xlsx") %>%
 
 ```{r}
 ProcessTargetResults_GDSC <- ProcessTargetResults
-tarMat_GDSC <- ProcessTargetResults$resTarMat
+tarMat_GDSC <- ProcessTargetResults$targetMatrix
 viabMat_GDSC <- sanger_mat_forest.scale[rownames(tarMat_GDSC),]
-save(tarMat_GDSC, viabMat_GDSC, ProcessTargetResults_GDSC, file = "../output/inputs_GDSC.RData")
+save(tarMat_GDSC, viabMat_GDSC, ProcessTargetResults_GDSC, mutation_GDSC,
+     file = "../output/inputs_GDSC.RData")
 ```
 

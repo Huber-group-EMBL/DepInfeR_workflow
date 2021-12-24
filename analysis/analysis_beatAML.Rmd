@@ -43,7 +43,7 @@ dim(viabMat_BeatAML)
 Perform multivariant LASSO regression based on a drug-protein affinity matrix and a drug response matrix.  
 This chunk can take a long time to run. Therefore we will save the result for later use to save time. 
 ```{r lasso beatAML, eval=FALSE}
-result <- runLASSOregression(TargetMatrix = tarMat_BeatAML , ViabMatrix = viabMat_BeatAML, seed = 333)
+result <- runLASSOregression(TargetMatrix = tarMat_BeatAML , ResponseMatrix = viabMat_BeatAML, seed = 333)
 
 #remove targets that were never selected
 useTar <- rowSums(result$coefMat) != 0
@@ -122,7 +122,7 @@ sample_anno_final <- as.data.frame(sample_anno_final)
 
 Association test for target importance matrix
 ```{r}
-testRes <-  depInfeR::diffImportance(result$coefMat, sample_anno_final)
+testRes <-  diffImportance(result$coefMat, sample_anno_final)
 ```
 
 Boxplot of significant pairs

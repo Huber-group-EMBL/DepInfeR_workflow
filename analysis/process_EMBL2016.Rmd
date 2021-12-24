@@ -197,7 +197,7 @@ tarMat_kd <- dplyr::filter(targets, targetClassification == "High confidence") %
 ## Re-scale Kd values and collapse highly correlated drugs
 Apply drug-target preprocessing function
 ```{r}
-ProcessTargetResults <- processTarget(tarMat_kd, ifKd = TRUE , ifCorFeat = TRUE, keepTargets = c("BTK","LYN","SRC","SYK", "WEE1"))
+ProcessTargetResults <- processTarget(tarMat_kd, KdAsInput  = TRUE , removeCorrelated = TRUE, keepTargets = c("BTK","LYN","SRC","SYK", "WEE1"))
 ```
 
 ## Plot target groups
@@ -254,7 +254,7 @@ viabMat <- spread(viabTab, patientID, viab) %>%
 ```{r}
 targetsEMBL <- targets
 ProcessTargetResults_EMBL <- ProcessTargetResults
-tarMat_EMBL <- ProcessTargetResults$resTarMat
+tarMat_EMBL <- ProcessTargetResults$targetMatrix
 viabMat_EMBL <- viabMat[rownames(tarMat_EMBL),]
 annotation_EMBL <- patMeta
 save(tarMat_EMBL, viabMat_EMBL, annotation_EMBL, ProcessTargetResults_EMBL, targetsEMBL, file = "../output/inputs_EMBL.RData")

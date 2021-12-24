@@ -43,7 +43,7 @@ dim(viabMat_GDSC)
 Perform multivariant LASSO regression based on a drug-protein affinity matrix and a drug response matrix.  
 This chunk can take a long time to run. Therefore we will save the result for later use to save time. 
 ```{r lasso gdsc, eval=FALSE}
-result <- runLASSOregression(TargetMatrix = tarMat_GDSC, ViabMatrix = viabMat_GDSC, seed = 333)
+result <- runLASSOregression(TargetMatrix = tarMat_GDSC, ResponseMatrix = viabMat_GDSC, seed = 333)
 
 #remove targets that were never selected
 useTar <- rowSums(result$coefMat) != 0
@@ -80,7 +80,7 @@ annoColor <- list(H2O2 = c(`-1` = "red", `0` = "black", `1` = "green"),
                   Wnt = c(`-1` = "red", `0` = "black", `1` = "green"),
                   VEGF = c(`-1` = "red", `0` = "black", `1` = "green"),
                   PI3K.only = c(`-1` = "red", `0` = "black", `1` = "green"),
-                  TCGA.classification = c(ALL="#BC3C29FF",LAML="#E18727FF",DLBC="#20854EFF","BRCAHer-"="#0072B5FF",'BRCAHer+'="#7876B1FF"),
+                  TCGA.classification = c(ALL="#BC3C29FF",AML="#E18727FF",DLBC="#20854EFF","BRCAHer-"="#0072B5FF",'BRCAHer+'="#7876B1FF"),
                   ARID1A_mut = c(`1` = "black",`0` = "grey80"),
                   EP300_mut = c(`1` = "black",`0` = "grey80"),
                   PTEN_mut = c(`1` = "black",`0` = "grey80"),
@@ -103,7 +103,7 @@ plotTab_scaled <- scale(t(plotTab), center = FALSE, scale= TRUE)
 plotTab <- t(plotTab_scaled)
 levels(mutation_GDSC$TCGA.classification) <- c(levels(mutation_GDSC$TCGA.classification), "BRCAHer-")
 mutation_GDSC$TCGA.classification[mutation_GDSC$TCGA.classification=="BRCA"] <- "BRCAHer-"
-mutation_GDSC$TCGA.classification <- factor(mutation_GDSC$TCGA.classification, levels = c("ALL", "LAML", "DLBC", "BRCAHer-", "BRCAHer+"))
+mutation_GDSC$TCGA.classification <- factor(mutation_GDSC$TCGA.classification, levels = c("ALL", "AML", "DLBC", "BRCAHer-", "BRCAHer+"))
 mutation_GDSC$missing_value_perc <- NULL
 
 pheatmap(plotTab, 
@@ -141,7 +141,7 @@ plotTab <- t(scale(t(result$coefMat))) %>% data.frame() %>%
 
 
 plotTab <- plotTab %>% dplyr::filter(target %in% CancerType$targetName)
-plotTab$Cancer_Type <- factor(plotTab$Cancer_Type, levels = c("ALL", "LAML","DLBC", "BRCAHer-", "BRCAHer+"))
+plotTab$Cancer_Type <- factor(plotTab$Cancer_Type, levels = c("ALL", "AML","DLBC", "BRCAHer-", "BRCAHer+"))
 
 ggplot(plotTab, aes(x = target, y = coef, group=Cancer_Type)) +
  geom_jitter(
@@ -164,7 +164,7 @@ Radar plot visualization
 ```{r GDSC_diffCoef_radar, fig.height=4.5, fig.width=6.5}
 starMatrix <- plotTab  %>% dplyr::select(target, Cancer_Type, meanCoef)  %>% distinct()
 starMatrix <- starMatrix %>% pivot_wider(names_from = target, values_from = meanCoef) 
-starMatrix <- starMatrix %>% mutate(Cancer_Type =  factor(Cancer_Type, levels = c("ALL", "LAML","DLBC", "BRCAHer-", "BRCAHer+"))) %>% arrange(Cancer_Type) 
+starMatrix <- starMatrix %>% mutate(Cancer_Type =  factor(Cancer_Type, levels = c("ALL", "AML","DLBC", "BRCAHer-", "BRCAHer+"))) %>% arrange(Cancer_Type) 
 starMatrix <- starMatrix %>% column_to_rownames("Cancer_Type")
 starMatrix_norm <- (as.matrix(starMatrix) + abs(min(starMatrix)))
 zeroValue <-abs(min(starMatrix)) / max(starMatrix_norm)
