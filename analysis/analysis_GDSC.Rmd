@@ -43,7 +43,8 @@ dim(viabMat_GDSC)
 Perform multivariant LASSO regression based on a drug-protein affinity matrix and a drug response matrix.  
 This chunk can take a long time to run. Therefore we will save the result for later use to save time. 
 ```{r lasso gdsc, eval=FALSE}
-result <- runLASSOregression(TargetMatrix = tarMat_GDSC, ResponseMatrix = viabMat_GDSC, seed = 333)
+set.seed(333)
+result <- runLASSOregression(TargetMatrix = tarMat_GDSC, ResponseMatrix = viabMat_GDSC)
 
 #remove targets that were never selected
 useTar <- rowSums(result$coefMat) != 0

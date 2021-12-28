@@ -47,11 +47,12 @@ dim(viabMat_EMBL)
 Perform multivariant LASSO regression based on a drug-protein affinity matrix and a drug response matrix.  
 This chunk can take a long time to run. Therefore we will save the result for later use to save time. 
 ```{r lasso, eval=FALSE}
+set.seed(333)
 #column wise scale of the viability matrix, to keep the drug effect rank
 viabMat.scale <- t(mscale(t(viabMat_EMBL)))
 
 #run lasso regression
-result <- runLASSOregression(TargetMatrix = tarMat_EMBL , ResponseMatrix = viabMat.scale, seed = 333)
+result <- runLASSOregression(TargetMatrix = tarMat_EMBL , ResponseMatrix = viabMat.scale)
 
 #remove targets that were never selected
 useTar <- rowSums(result$coefMat) != 0
