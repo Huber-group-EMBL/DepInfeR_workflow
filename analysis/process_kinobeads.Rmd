@@ -58,22 +58,20 @@ plotTab <- tarList %>% filter(`Target Classification` =="High confidence") %>%
 
 p1 <- ggplot(plotTab, aes(x=nTar)) + geom_histogram(alpha=0.5, col="grey20") + 
   scale_x_continuous(n.breaks = 10) +
-  xlab("") + ylab("count") +
+  xlab("number of kinases") + ylab("count") +
   xlim(0,100) + ylim(0,50) +
   ggtitle("Distribution of number \nof kinase targets per drug") +
   theme_custom
 ```
 
-### Drug perkinases
-
-### Kinases per drug
+### Drug per kinases
 ```{r}
 plotTab <- tarList %>% filter(`Target Classification` =="High confidence") %>%
   group_by(`Gene Name`) %>% summarise(nDrug = length(Drug))
 
 p2 <- ggplot(plotTab, aes(x=nDrug)) + geom_histogram(alpha=0.5, col="grey20") + 
   scale_x_continuous(n.breaks = 10) +
-  xlab("") + ylab("count") +
+  xlab("number of drugs") + ylab("count") +
   xlim(0,100) + ylim(0,70) +
   ggtitle("Distribution of number of \ndrugs per kinase target") +
   theme_custom

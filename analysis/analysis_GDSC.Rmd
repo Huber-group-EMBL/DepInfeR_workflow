@@ -1,5 +1,5 @@
 ---
-title: "Pre-processing GDSC drug screen datasets"
+title: "Apply DepInfeR to the GDSC drug screen datasets"
 author: "Junyan Lu"
 date: "2021-10-05"
 output: workflowr::wflow_html
@@ -11,7 +11,7 @@ editor_options:
 
 Packages
 ```{r package, message=FALSE, warning=FALSE}
-library(depInfeR)
+library(DepInfeR)
 library(RColorBrewer)
 library(pheatmap)
 library(ggbeeswarm)

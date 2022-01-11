@@ -13,7 +13,7 @@
 
 <meta name="date" content="2021-10-05" />
 
-<title>Pre-processing GDSC drug screen datasets</title>
+<title>Apply DepInfeR to the EMBL2016 dataset</title>
 
 <script src="site_libs/header-attrs-2.11/header-attrs.js"></script>
 <script src="site_libs/jquery-3.6.0/jquery-3.6.0.min.js"></script>
@@ -344,7 +344,7 @@ div.tocify {
 
 
 
-<h1 class="title toc-ignore">Pre-processing GDSC drug screen datasets</h1>
+<h1 class="title toc-ignore">Apply DepInfeR to the EMBL2016 dataset</h1>
 <h4 class="author">Junyan Lu</h4>
 <h4 class="date">2021-10-05</h4>
 
@@ -371,7 +371,7 @@ div.tocify {
 <div class="tab-content">
 <div id="summary" class="tab-pane fade in active">
 <p>
-<strong>Last updated:</strong> 2021-12-24
+<strong>Last updated:</strong> 2022-01-11
 </p>
 <p>
 <strong>Checks:</strong> <span class="glyphicon glyphicon-ok text-success" aria-hidden="true"></span> 6 <span class="glyphicon glyphicon-exclamation-sign text-danger" aria-hidden="true"></span> 1
@@ -542,7 +542,7 @@ There are no past versions. Publish this analysis with <code>wflow_publish()</co
 <div id="load-packages" class="section level1">
 <h1>Load packages</h1>
 <p>Packages</p>
-<pre class="r"><code>library(depInfeR)
+<pre class="r"><code>library(DepInfeR)
 library(RColorBrewer)
 library(pheatmap)
 library(ggbeeswarm)
@@ -571,11 +571,12 @@ knitr::opts_chunk$set(dev=c(&quot;png&quot;,&quot;pdf&quot;))</code></pre>
 <h1>Multivariant model for protein dependence prediction</h1>
 <p>Perform multivariant LASSO regression based on a drug-protein affinity matrix and a drug response matrix.<br />
 This chunk can take a long time to run. Therefore we will save the result for later use to save time.</p>
-<pre class="r"><code>#column wise scale of the viability matrix, to keep the drug effect rank
+<pre class="r"><code>set.seed(333)
+#column wise scale of the viability matrix, to keep the drug effect rank
 viabMat.scale &lt;- t(mscale(t(viabMat_EMBL)))
 
 #run lasso regression
-result &lt;- runLASSOregression(TargetMatrix = tarMat_EMBL , ResponseMatrix = viabMat.scale, seed = 333)
+result &lt;- runLASSOregression(TargetMatrix = tarMat_EMBL , ResponseMatrix = viabMat.scale)
 
 #remove targets that were never selected
 useTar &lt;- rowSums(result$coefMat) != 0
@@ -1684,7 +1685,7 @@ other attached packages:
  [5] readr_2.1.1        tidyr_1.1.4        tibble_3.1.6       tidyverse_1.3.1   
  [9] factoextra_1.0.7   igraph_1.2.10      fpc_2.2-9          ggrepel_0.9.1     
 [13] ggbeeswarm_0.6.0   ggplot2_3.3.5      pheatmap_1.0.12    RColorBrewer_1.1-2
-[17] depInfeR_0.1.0    
+[17] DepInfeR_0.1.0    
 
 loaded via a namespace (and not attached):
   [1] colorspace_2.0-2   ggsignif_0.6.3     ellipsis_0.3.2    
@@ -1693,34 +1694,35 @@ loaded via a namespace (and not attached):
  [10] ggpubr_0.4.0       farver_2.1.0       flexmix_2.3-17    
  [13] fansi_0.5.0        lubridate_1.8.0    xml2_1.3.3        
  [16] codetools_0.2-18   splines_4.1.2      doParallel_1.0.16 
- [19] robustbase_0.93-9  knitr_1.36         rlist_0.4.6.2     
+ [19] robustbase_0.93-9  knitr_1.37         rlist_0.4.6.2     
  [22] jsonlite_1.7.2     workflowr_1.7.0    gt_0.3.1          
  [25] broom_0.7.10       cluster_2.1.2      kernlab_0.9-29    
  [28] dbplyr_2.1.1       compiler_4.1.2     httr_1.4.2        
  [31] backports_1.4.1    assertthat_0.2.1   Matrix_1.4-0      
  [34] fastmap_1.1.0      cli_3.1.0          later_1.3.0       
  [37] htmltools_0.5.2    tools_4.1.2        gtable_0.3.0      
- [40] glue_1.5.1         Rcpp_1.0.7         carData_3.0-4     
- [43] cellranger_1.1.0   jquerylib_0.1.4    vctrs_0.3.8       
- [46] iterators_1.0.13   xfun_0.29          rvest_1.0.2       
- [49] lifecycle_1.0.1    rstatix_0.7.0      DEoptimR_1.0-9    
- [52] MASS_7.3-54        scales_1.1.1       hms_1.1.1         
- [55] promises_1.2.0.1   parallel_4.1.2     yaml_2.2.1        
- [58] sass_0.4.0         stringi_1.7.6      highr_0.9         
- [61] foreach_1.5.1      checkmate_2.0.0    shape_1.4.6       
- [64] rlang_0.4.12       pkgconfig_2.0.3    prabclus_2.3-2    
- [67] matrixStats_0.61.0 evaluate_0.14      lattice_0.20-45   
- [70] labeling_0.4.2     cowplot_1.1.1      tidyselect_1.1.1  
- [73] magrittr_2.0.1     R6_2.5.1           generics_0.1.1    
- [76] DBI_1.1.1          pillar_1.6.4       haven_2.4.3       
- [79] withr_2.4.3        survival_3.2-13    abind_1.4-5       
- [82] nnet_7.3-16        modelr_0.1.8       crayon_1.4.2      
- [85] car_3.0-12         utf8_1.2.2         tzdb_0.2.0        
- [88] rmarkdown_2.11     grid_4.1.2         readxl_1.3.1      
- [91] data.table_1.14.2  git2r_0.29.0       reprex_2.0.1      
- [94] digest_0.6.29      diptest_0.76-0     httpuv_1.6.4      
- [97] stats4_4.1.2       munsell_0.5.0      glmnet_4.1-3      
-[100] beeswarm_0.4.0     vipor_0.4.5        bslib_0.3.1       </code></pre>
+ [40] glue_1.6.0         doRNG_1.8.2        Rcpp_1.0.7        
+ [43] carData_3.0-4      cellranger_1.1.0   jquerylib_0.1.4   
+ [46] vctrs_0.3.8        iterators_1.0.13   xfun_0.29         
+ [49] rvest_1.0.2        lifecycle_1.0.1    rngtools_1.5.2    
+ [52] rstatix_0.7.0      DEoptimR_1.0-9     MASS_7.3-54       
+ [55] scales_1.1.1       hms_1.1.1          promises_1.2.0.1  
+ [58] parallel_4.1.2     yaml_2.2.1         sass_0.4.0        
+ [61] stringi_1.7.6      highr_0.9          foreach_1.5.1     
+ [64] checkmate_2.0.0    shape_1.4.6        rlang_0.4.12      
+ [67] pkgconfig_2.0.3    prabclus_2.3-2     matrixStats_0.61.0
+ [70] evaluate_0.14      lattice_0.20-45    labeling_0.4.2    
+ [73] cowplot_1.1.1      tidyselect_1.1.1   magrittr_2.0.1    
+ [76] R6_2.5.1           generics_0.1.1     DBI_1.1.2         
+ [79] pillar_1.6.4       haven_2.4.3        withr_2.4.3       
+ [82] abind_1.4-5        survival_3.2-13    nnet_7.3-16       
+ [85] car_3.0-12         modelr_0.1.8       crayon_1.4.2      
+ [88] utf8_1.2.2         tzdb_0.2.0         rmarkdown_2.11    
+ [91] grid_4.1.2         readxl_1.3.1       data.table_1.14.2 
+ [94] git2r_0.29.0       reprex_2.0.1       digest_0.6.29     
+ [97] diptest_0.76-0     httpuv_1.6.4       stats4_4.1.2      
+[100] munsell_0.5.0      glmnet_4.1-3       beeswarm_0.4.0    
+[103] vipor_0.4.5        bslib_0.3.1       </code></pre>
 </div>
 </div>
 </div>
